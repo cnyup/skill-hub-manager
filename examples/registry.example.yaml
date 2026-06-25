@@ -1,0 +1,8 @@
+skills:
+  k8s-finder:
+    path: /Users/yup/.skill-hub/skills/k8s-finder
+    tags: [infra, kubernetes]
+    visibility: private
+    agents: [codex, claude]
+    version: 3
+

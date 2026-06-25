@@ -1,0 +1,6 @@
+name: project-a
+agent: codex
+skills:
+  - billing-labeler
+  - k8s-finder
+

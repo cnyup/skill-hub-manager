@@ -68,11 +68,20 @@ def main(argv: list[str] | None = None) -> int:
         result = sync_profile(profile, scan_skills(vault), target)
         if args.root:
             paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
-            write_sync_state(paths.state / "last-sync.json", profile, target, result.linked, result.missing)
+            write_sync_state(
+                paths.state / "last-sync.json",
+                profile,
+                target,
+                result.linked,
+                result.missing,
+                result.removed,
+            )
         for name in result.linked:
             print(f"linked: {name}")
         for name in result.missing:
             print(f"missing: {name}")
+        for name in result.removed:
+            print(f"removed: {name}")
         return 1 if result.missing else 0
     if args.command == "doctor":
         target = _resolve_doctor_target(args)

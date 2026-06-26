@@ -63,6 +63,8 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli doctor --root /Users/yup/.skill-
 
 When you run `sync --root`, the CLI also records the last sync result in `state/last-sync.json`. `doctor --root` uses that file to find the last synced target and report expected links that have disappeared since the last sync.
 
+`sync` is now convergent for symlinks in the target directory: it removes stale symlink entries that are not part of the current profile, while leaving regular files untouched.
+
 ## Status
 
 Local-first CLI MVP in progress. Code is not pushed unless explicitly requested.

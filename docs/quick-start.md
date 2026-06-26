@@ -52,6 +52,8 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli sync --root /Users/yup/.skill-hu
 
 This also writes `/Users/yup/.skill-hub/state/last-sync.json` so later checks can detect drift from the last successful sync.
 
+During sync, stale symlink entries in the target that are no longer part of the current profile are removed automatically. Regular files in the target are not modified.
+
 You can also inspect the current vault contents:
 
 ```bash

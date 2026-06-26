@@ -107,6 +107,34 @@ class CliTests(unittest.TestCase):
             self.assertIn("linked: k8s-finder", output.getvalue())
             self.assertTrue((root / "state" / "last-sync.json").is_file())
 
+    def test_sync_command_records_removed_stale_links_in_state(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            current = root / "skills" / "k8s-finder"
+            stale = root / "skills" / "old-skill"
+            current.mkdir(parents=True)
+            stale.mkdir(parents=True)
+            (current / "SKILL.md").write_text("# current", encoding="utf-8")
+            (stale / "SKILL.md").write_text("# stale", encoding="utf-8")
+            profile = root / "profiles" / "default.yaml"
+            profile.parent.mkdir(parents=True)
+            profile.write_text(
+                "name: default\nagent: codex\nskills:\n  - k8s-finder\n",
+                encoding="utf-8",
+            )
+            target = Path(temp_dir) / "target"
+            target.mkdir()
+            (target / "old-skill").symlink_to(stale, target_is_directory=True)
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["sync", "--root", str(root), "--target", str(target)])
+
+            state = (root / "state" / "last-sync.json").read_text(encoding="utf-8")
+            self.assertEqual(exit_code, 0)
+            self.assertIn('"removed": [', state)
+            self.assertIn('"old-skill"', state)
+
     def test_doctor_command_reports_broken_links(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

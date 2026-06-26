@@ -46,6 +46,13 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli registry build --root /Users/yup
 
 This writes `/Users/yup/.skill-hub/state/registry.yaml` with stable ordering and basic skill metadata from `SKILL.md` frontmatter.
 
+You can inspect or search the generated registry:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli ls --root /Users/yup/.skill-hub
+PYTHONPATH=src python3 -m skill_hub_manager.cli find --root /Users/yup/.skill-hub --query kubernetes
+```
+
 ## 5. Sync the profile
 
 Use the sync command to materialize symlinks into the target agent directory.

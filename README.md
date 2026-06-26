@@ -32,6 +32,8 @@ The MVP provides:
 - `skill-hub init --root <path>`
 - `skill-hub registry build --root <path>`
 - `skill-hub scan --root <path>`
+- `skill-hub ls --root <path>`
+- `skill-hub find --root <path> --query <text>`
 - `skill-hub profile list --root <path>`
 - `skill-hub profile show --root <path> --name <profile>`
 - `skill-hub sync --root <path> --target <path>`
@@ -55,6 +57,13 @@ Scan the workspace vault:
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli scan --root /Users/yup/.skill-hub
+```
+
+Query the generated registry:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli ls --root /Users/yup/.skill-hub
+PYTHONPATH=src python3 -m skill_hub_manager.cli find --root /Users/yup/.skill-hub --query kubernetes
 ```
 
 Inspect available profiles and their effective skills:

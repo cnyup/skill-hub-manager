@@ -5,7 +5,7 @@ from skill_hub_manager import __version__
 from skill_hub_manager.doctor import find_broken_links, find_missing_expected_links, load_sync_target
 from skill_hub_manager.paths import initialize_workspace, resolve_workspace_root, workspace_paths
 from skill_hub_manager.profiles import list_profiles, load_profile
-from skill_hub_manager.registry import write_registry
+from skill_hub_manager.registry import find_registry_entries, load_registry_entries, write_registry
 from skill_hub_manager.skills import scan_skills
 from skill_hub_manager.sync import sync_profile, write_sync_state
 
@@ -18,6 +18,13 @@ def build_parser() -> argparse.ArgumentParser:
     scan = subparsers.add_parser("scan")
     scan.add_argument("--vault")
     scan.add_argument("--root")
+
+    ls_cmd = subparsers.add_parser("ls")
+    ls_cmd.add_argument("--root", required=True)
+
+    find_cmd = subparsers.add_parser("find")
+    find_cmd.add_argument("--root", required=True)
+    find_cmd.add_argument("--query", required=True)
 
     init = subparsers.add_parser("init")
     init.add_argument("--root", required=True)
@@ -61,6 +68,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "scan":
         for name in scan_skills(_resolve_scan_vault(args)):
             print(name)
+        return 0
+    if args.command == "ls":
+        paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
+        for entry in load_registry_entries(paths.state / "registry.yaml"):
+            print(entry["name"])
+        return 0
+    if args.command == "find":
+        paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
+        entries = load_registry_entries(paths.state / "registry.yaml")
+        for entry in find_registry_entries(entries, args.query):
+            print(entry["name"])
         return 0
     if args.command == "init":
         paths = initialize_workspace(Path(args.root))

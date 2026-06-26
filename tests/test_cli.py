@@ -268,6 +268,51 @@ class CliTests(unittest.TestCase):
             self.assertTrue(output_path.is_file())
             self.assertIn("k8s-finder:", output_path.read_text(encoding="utf-8"))
 
+    def test_ls_command_prints_registry_names(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            skills = root / "skills"
+            alpha = skills / "alpha-skill"
+            zebra = skills / "zebra-skill"
+            alpha.mkdir(parents=True)
+            zebra.mkdir(parents=True)
+            (alpha / "SKILL.md").write_text("---\nname: alpha-skill\nvisibility: team\n---\n", encoding="utf-8")
+            (zebra / "SKILL.md").write_text("---\nname: zebra-skill\nvisibility: private\n---\n", encoding="utf-8")
+            main(["registry", "build", "--root", str(root)])
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["ls", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(output.getvalue().strip().splitlines(), ["alpha-skill", "zebra-skill"])
+
+    def test_find_command_searches_registry(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            skills = root / "skills"
+            finder = skills / "k8s-finder"
+            labeler = skills / "billing-labeler"
+            finder.mkdir(parents=True)
+            labeler.mkdir(parents=True)
+            (finder / "SKILL.md").write_text(
+                "---\nname: k8s-finder\ndescription: Find Kubernetes services\ntags:\n  - infra\n  - kubernetes\nvisibility: team\n---\n",
+                encoding="utf-8",
+            )
+            (labeler / "SKILL.md").write_text(
+                "---\nname: billing-labeler\ndescription: Label billing rows\nvisibility: private\n---\n",
+                encoding="utf-8",
+            )
+            main(["registry", "build", "--root", str(root)])
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["find", "--root", str(root), "--query", "kubernetes"])
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("k8s-finder", output.getvalue())
+            self.assertNotIn("billing-labeler", output.getvalue())
+
     def test_profile_list_command_shows_workspace_profiles(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "workspace"

@@ -75,3 +75,46 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 1)
         self.assertIn("broken: missing", output.getvalue())
+
+    def test_init_command_creates_local_workspace(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["init", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((root / "skills").is_dir())
+            self.assertTrue((root / "profiles").is_dir())
+            self.assertTrue((root / "state").is_dir())
+            self.assertTrue((root / "profiles" / "default.yaml").is_file())
+            self.assertIn("initialized:", output.getvalue())
+
+    def test_registry_build_command_writes_registry_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            vault = root / "skills"
+            skill = vault / "k8s-finder"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("# skill", encoding="utf-8")
+            output_path = root / "state" / "registry.yaml"
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "registry",
+                        "build",
+                        "--vault",
+                        str(vault),
+                        "--output",
+                        str(output_path),
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(output_path.is_file())
+            self.assertIn("skills:", output_path.read_text(encoding="utf-8"))
+            self.assertIn("k8s-finder:", output_path.read_text(encoding="utf-8"))
+            self.assertIn("wrote:", output.getvalue())

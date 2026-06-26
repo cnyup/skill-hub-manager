@@ -3,7 +3,9 @@ from pathlib import Path
 
 from skill_hub_manager import __version__
 from skill_hub_manager.doctor import find_broken_links
+from skill_hub_manager.paths import initialize_workspace
 from skill_hub_manager.profiles import load_profile
+from skill_hub_manager.registry import write_registry
 from skill_hub_manager.skills import scan_skills
 from skill_hub_manager.sync import sync_profile
 
@@ -15,6 +17,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     scan = subparsers.add_parser("scan")
     scan.add_argument("--vault", required=True)
+
+    init = subparsers.add_parser("init")
+    init.add_argument("--root", required=True)
+
+    registry = subparsers.add_parser("registry")
+    registry_subparsers = registry.add_subparsers(dest="registry_command")
+    registry_build = registry_subparsers.add_parser("build")
+    registry_build.add_argument("--vault", required=True)
+    registry_build.add_argument("--output", required=True)
 
     sync = subparsers.add_parser("sync")
     sync.add_argument("--vault", required=True)
@@ -36,6 +47,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "scan":
         for name in scan_skills(Path(args.vault)):
             print(name)
+        return 0
+    if args.command == "init":
+        paths = initialize_workspace(Path(args.root))
+        print(f"initialized: {paths.root}")
+        return 0
+    if args.command == "registry" and args.registry_command == "build":
+        output = write_registry(Path(args.vault), Path(args.output))
+        print(f"wrote: {output}")
         return 0
     if args.command == "sync":
         profile = load_profile(Path(args.profile))

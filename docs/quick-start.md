@@ -1,18 +1,27 @@
 # Quick Start
 
-## 1. Create a local vault
+## 1. Initialize a local workspace
 
-Choose a directory outside the GitHub repository, for example:
+Use a directory outside the GitHub repository:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli init --root /Users/yup/.skill-hub
+```
+
+This creates:
 
 ```text
-/Users/yup/.skill-hub/skills
+/Users/yup/.skill-hub/
+  skills/
+  profiles/
+  state/
 ```
 
 ## 2. Place skills in the vault
 
 Each skill should live in its own directory and contain a `SKILL.md`.
 
-## 3. Create a profile
+## 3. Create or edit a profile
 
 Start with a simple allowlist:
 
@@ -24,18 +33,26 @@ skills:
   - billing-labeler
 ```
 
-## 4. Sync the profile
+## 4. Build the registry
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli registry build \
+  --vault /Users/yup/.skill-hub/skills \
+  --output /Users/yup/.skill-hub/state/registry.yaml
+```
+
+## 5. Sync the profile
 
 Use the sync command to materialize symlinks into the target agent directory.
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli sync \
   --vault /Users/yup/.skill-hub/skills \
-  --profile /Users/yup/.config/skill-hub/profiles/project-a.yaml \
+  --profile /Users/yup/.skill-hub/profiles/project-a.yaml \
   --target /Users/yup/.codex/skills
 ```
 
-## 5. Verify
+## 6. Verify
 
 Run the doctor or audit command to confirm all links resolve correctly.
 

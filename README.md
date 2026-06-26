@@ -29,6 +29,8 @@ The real skill content lives in a local vault outside the repo, and this project
 The MVP provides:
 
 - `skill-hub --version`
+- `skill-hub init --root <path>`
+- `skill-hub registry build --vault <path> --output <path>`
 - `skill-hub scan --vault <path>`
 - `skill-hub sync --vault <path> --profile <profile.yaml> --target <path>`
 - `skill-hub doctor --target <path>`
@@ -36,7 +38,15 @@ The MVP provides:
 Run from a checkout without installing:
 
 ```bash
-PYTHONPATH=src python3 -m skill_hub_manager.cli scan --vault /Users/yup/.skill-hub/skills
+PYTHONPATH=src python3 -m skill_hub_manager.cli init --root /Users/yup/.skill-hub
+```
+
+Then build a registry from the local vault:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli registry build \
+  --vault /Users/yup/.skill-hub/skills \
+  --output /Users/yup/.skill-hub/state/registry.yaml
 ```
 
 ## Status

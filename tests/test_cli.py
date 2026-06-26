@@ -135,6 +135,37 @@ class CliTests(unittest.TestCase):
             self.assertIn('"removed": [', state)
             self.assertIn('"old-skill"', state)
 
+    def test_sync_command_respects_profile_exclude(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            kept = root / "skills" / "k8s-finder"
+            excluded = root / "skills" / "billing-labeler"
+            kept.mkdir(parents=True)
+            excluded.mkdir(parents=True)
+            (kept / "SKILL.md").write_text("# kept", encoding="utf-8")
+            (excluded / "SKILL.md").write_text("# excluded", encoding="utf-8")
+            profile = root / "profiles" / "default.yaml"
+            profile.parent.mkdir(parents=True)
+            profile.write_text(
+                "name: default\n"
+                "agent: codex\n"
+                "skills:\n"
+                "  - k8s-finder\n"
+                "  - billing-labeler\n"
+                "exclude:\n"
+                "  - billing-labeler\n",
+                encoding="utf-8",
+            )
+            target = Path(temp_dir) / "target"
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["sync", "--root", str(root), "--target", str(target)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((target / "k8s-finder").is_symlink())
+            self.assertFalse((target / "billing-labeler").exists())
+
     def test_doctor_command_reports_broken_links(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

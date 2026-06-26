@@ -31,7 +31,11 @@ agent: codex
 skills:
   - k8s-finder
   - billing-labeler
+exclude:
+  - billing-labeler
 ```
+
+`exclude` currently supports explicit skill names only.
 
 ## 4. Build the registry
 

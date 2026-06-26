@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -7,6 +7,11 @@ class Profile:
     name: str
     agent: str
     skills: list[str]
+    exclude: list[str] = field(default_factory=list)
+
+    def effective_skills(self) -> list[str]:
+        excluded = set(self.exclude)
+        return [skill for skill in self.skills if skill not in excluded]
 
 
 def load_profile(path: Path) -> Profile:
@@ -15,6 +20,7 @@ def load_profile(path: Path) -> Profile:
         name=data["name"],
         agent=data["agent"],
         skills=data.get("skills", []),
+        exclude=data.get("exclude", []),
     )
 
 

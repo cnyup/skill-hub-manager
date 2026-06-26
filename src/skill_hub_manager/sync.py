@@ -18,14 +18,15 @@ def sync_profile(profile: Profile, skills: dict[str, Skill], target: Path) -> Sy
     linked: list[str] = []
     missing: list[str] = []
     removed: list[str] = []
-    desired = set(profile.skills)
+    desired_skills = profile.effective_skills()
+    desired = set(desired_skills)
     for child in sorted(target.iterdir()):
         if child.name in desired:
             continue
         if child.is_symlink():
             child.unlink()
             removed.append(child.name)
-    for skill_name in profile.skills:
+    for skill_name in desired_skills:
         skill = skills.get(skill_name)
         if skill is None:
             missing.append(skill_name)

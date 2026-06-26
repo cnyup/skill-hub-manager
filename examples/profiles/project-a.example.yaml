@@ -3,4 +3,5 @@ agent: codex
 skills:
   - billing-labeler
   - k8s-finder
-
+exclude:
+  - billing-labeler

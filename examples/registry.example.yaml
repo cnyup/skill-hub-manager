@@ -1,8 +1,7 @@
 skills:
   k8s-finder:
     path: /Users/yup/.skill-hub/skills/k8s-finder
-    tags: [infra, kubernetes]
     visibility: private
+    description: Find Kubernetes services from IPs and ownership clues
     agents: [codex, claude]
-    version: 3
-
+    tags: [infra, kubernetes]

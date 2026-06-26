@@ -39,7 +39,7 @@ skills:
 PYTHONPATH=src python3 -m skill_hub_manager.cli registry build --root /Users/yup/.skill-hub
 ```
 
-This writes `/Users/yup/.skill-hub/state/registry.yaml` and records basic skill metadata from `SKILL.md` frontmatter.
+This writes `/Users/yup/.skill-hub/state/registry.yaml` with stable ordering and basic skill metadata from `SKILL.md` frontmatter.
 
 ## 5. Sync the profile
 

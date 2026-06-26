@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from skill_hub_manager.registry import write_registry
+from skill_hub_manager.registry import build_registry, write_registry
 
 
 class RegistryTests(unittest.TestCase):
@@ -39,3 +39,37 @@ class RegistryTests(unittest.TestCase):
             self.assertIn("visibility: team", content)
             self.assertIn("agents: [codex, claude]", content)
             self.assertIn("tags: [infra, kubernetes]", content)
+
+    def test_build_registry_sorts_skills_and_omits_empty_optional_fields(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            vault = root / "skills"
+            zebra = vault / "zebra-skill"
+            alpha = vault / "alpha-skill"
+            zebra.mkdir(parents=True)
+            alpha.mkdir(parents=True)
+            (zebra / "SKILL.md").write_text(
+                "---\n"
+                "name: zebra-skill\n"
+                "visibility: private\n"
+                "---\n"
+                "# skill\n",
+                encoding="utf-8",
+            )
+            (alpha / "SKILL.md").write_text(
+                "---\n"
+                "name: alpha-skill\n"
+                "description: A skill\n"
+                "visibility: team\n"
+                "---\n"
+                "# skill\n",
+                encoding="utf-8",
+            )
+
+            content = build_registry(vault)
+
+        self.assertLess(content.index("alpha-skill:"), content.index("zebra-skill:"))
+        zebra_block = content.split("zebra-skill:", 1)[1]
+        self.assertNotIn("description:", zebra_block.split("alpha-skill:", 1)[0] if "alpha-skill:" in zebra_block else zebra_block)
+        self.assertNotIn("agents:", zebra_block)
+        self.assertNotIn("tags:", zebra_block)

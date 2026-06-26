@@ -47,7 +47,7 @@ Then build a registry from the local vault:
 PYTHONPATH=src python3 -m skill_hub_manager.cli registry build --root /Users/yup/.skill-hub
 ```
 
-The generated registry currently includes `path`, `description`, `visibility`, `agents`, and `tags` when those fields exist in `SKILL.md` frontmatter.
+The generated registry currently uses stable skill-name ordering and includes `path`, `visibility`, and any non-empty `description`, `agents`, and `tags` fields from `SKILL.md` frontmatter.
 
 Scan the workspace vault:
 

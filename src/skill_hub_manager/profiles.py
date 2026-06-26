@@ -53,6 +53,22 @@ def profile_path(profiles_dir: Path, name: str) -> Path:
     return profiles_dir / f"{name}.yaml"
 
 
+def update_profile(
+    profile: Profile,
+    agent: str | None = None,
+    add_skills: list[str] | None = None,
+    remove_skills: list[str] | None = None,
+    add_exclude: list[str] | None = None,
+    remove_exclude: list[str] | None = None,
+) -> Profile:
+    return Profile(
+        name=profile.name,
+        agent=agent or profile.agent,
+        skills=_merge_list(profile.skills, add_skills or [], remove_skills or []),
+        exclude=_merge_list(profile.exclude, add_exclude or [], remove_exclude or []),
+    )
+
+
 def _parse_simple_profile_yaml(content: str) -> dict[str, str | list[str]]:
     data: dict[str, str | list[str]] = {}
     active_list: str | None = None
@@ -94,3 +110,20 @@ def _render_profile(profile: Profile) -> str:
         lines.append("exclude:")
         lines.extend(f"  - {pattern}" for pattern in profile.exclude)
     return "\n".join(lines) + "\n"
+
+
+def _merge_list(existing: list[str], additions: list[str], removals: list[str]) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    removal_set = set(removals)
+    for item in existing:
+        if item in removal_set or item in seen:
+            continue
+        result.append(item)
+        seen.add(item)
+    for item in additions:
+        if item in removal_set or item in seen:
+            continue
+        result.append(item)
+        seen.add(item)
+    return result

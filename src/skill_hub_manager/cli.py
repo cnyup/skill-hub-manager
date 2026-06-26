@@ -5,7 +5,14 @@ from skill_hub_manager import __version__
 from skill_hub_manager.audit import audit_profiles
 from skill_hub_manager.doctor import find_broken_links, find_missing_expected_links, load_sync_target
 from skill_hub_manager.paths import initialize_workspace, resolve_workspace_root, workspace_paths
-from skill_hub_manager.profiles import Profile, list_profiles, load_profile, remove_profile, write_profile
+from skill_hub_manager.profiles import (
+    Profile,
+    list_profiles,
+    load_profile,
+    remove_profile,
+    update_profile,
+    write_profile,
+)
 from skill_hub_manager.registry import find_registry_entries, load_registry_entries, write_registry
 from skill_hub_manager.skills import scan_skills
 from skill_hub_manager.sync import sync_profile, write_sync_state
@@ -45,6 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
     sync.add_argument("--profile")
     sync.add_argument("--root")
     sync.add_argument("--target", required=True)
+    sync.add_argument("--dry-run", action="store_true")
 
     doctor = subparsers.add_parser("doctor")
     doctor.add_argument("--target")
@@ -70,6 +78,15 @@ def build_parser() -> argparse.ArgumentParser:
     profile_remove = profile_subparsers.add_parser("remove")
     profile_remove.add_argument("--root", required=True)
     profile_remove.add_argument("--name", required=True)
+
+    profile_update = profile_subparsers.add_parser("update")
+    profile_update.add_argument("--root", required=True)
+    profile_update.add_argument("--name", required=True)
+    profile_update.add_argument("--agent")
+    profile_update.add_argument("--add-skill", action="append", default=[])
+    profile_update.add_argument("--remove-skill", action="append", default=[])
+    profile_update.add_argument("--add-exclude", action="append", default=[])
+    profile_update.add_argument("--remove-exclude", action="append", default=[])
 
     return parser
 
@@ -116,8 +133,8 @@ def main(argv: list[str] | None = None) -> int:
         vault, profile_path = _resolve_sync_paths(args)
         profile = load_profile(profile_path)
         target = Path(args.target)
-        result = sync_profile(profile, scan_skills(vault), target)
-        if args.root:
+        result = sync_profile(profile, scan_skills(vault), target, dry_run=args.dry_run)
+        if args.root and not args.dry_run:
             paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
             write_sync_state(
                 paths.state / "last-sync.json",
@@ -127,6 +144,14 @@ def main(argv: list[str] | None = None) -> int:
                 result.missing,
                 result.removed,
             )
+        if args.dry_run:
+            for name in result.linked:
+                print(f"would-link: {name}")
+            for name in result.missing:
+                print(f"would-miss: {name}")
+            for name in result.removed:
+                print(f"would-remove: {name}")
+            return 1 if result.missing else 0
         for name in result.linked:
             print(f"linked: {name}")
         for name in result.missing:
@@ -178,6 +203,21 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         print(f"missing: {paths.profiles / f'{args.name}.yaml'}")
         return 1
+    if args.command == "profile" and args.profile_command == "update":
+        paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
+        path = paths.profiles / f"{args.name}.yaml"
+        profile = load_profile(path)
+        updated = update_profile(
+            profile,
+            agent=args.agent,
+            add_skills=args.add_skill,
+            remove_skills=args.remove_skill,
+            add_exclude=args.add_exclude,
+            remove_exclude=args.remove_exclude,
+        )
+        write_profile(paths.profiles, updated)
+        print(f"updated: {path}")
+        return 0
     parser.print_help()
     return 0
 

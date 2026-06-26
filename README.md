@@ -38,8 +38,9 @@ The MVP provides:
 - `skill-hub profile list --root <path>`
 - `skill-hub profile show --root <path> --name <profile>`
 - `skill-hub profile add --root <path> --name <profile> --agent <agent> --skill <skill>`
+- `skill-hub profile update --root <path> --name <profile>`
 - `skill-hub profile remove --root <path> --name <profile>`
-- `skill-hub sync --root <path> --target <path>`
+- `skill-hub sync --root <path> --target <path> [--dry-run]`
 - `skill-hub doctor --root <path>`
 
 Run from a checkout without installing:
@@ -95,6 +96,18 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli profile add --root /Users/yup/.s
 PYTHONPATH=src python3 -m skill_hub_manager.cli profile remove --root /Users/yup/.skill-hub --name default
 ```
 
+Incrementally update an existing profile:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile update --root /Users/yup/.skill-hub \
+  --name default \
+  --agent claude \
+  --add-skill release-checker \
+  --remove-skill billing-labeler \
+  --add-exclude legacy-* \
+  --remove-exclude experimental-*
+```
+
 Check for broken symlinks in the last synced target:
 
 ```bash
@@ -104,6 +117,14 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli doctor --root /Users/yup/.skill-
 When you run `sync --root`, the CLI also records the last sync result in `state/last-sync.json`. `doctor --root` uses that file to find the last synced target and report expected links that have disappeared since the last sync.
 
 `sync` is now convergent for symlinks in the target directory: it removes stale symlink entries that are not part of the current profile, while leaving regular files untouched.
+
+Use dry-run before a real sync if you want a change preview without touching the target directory or sync state:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli sync --root /Users/yup/.skill-hub \
+  --target /Users/yup/.codex/skills \
+  --dry-run
+```
 
 ## Status
 

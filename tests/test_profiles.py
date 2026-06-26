@@ -2,7 +2,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from skill_hub_manager.profiles import list_profiles, load_profile, remove_profile, write_profile
+from skill_hub_manager.profiles import (
+    list_profiles,
+    load_profile,
+    remove_profile,
+    update_profile,
+    write_profile,
+)
 
 
 class ProfileTests(unittest.TestCase):
@@ -111,6 +117,34 @@ class ProfileTests(unittest.TestCase):
 
         self.assertTrue(removed)
         self.assertFalse(path.exists())
+
+    def test_update_profile_applies_agent_skill_and_exclude_changes(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            profile = load_profile(
+                _write_fixture(
+                    Path(temp_dir) / "default.yaml",
+                    "name: default\n"
+                    "agent: codex\n"
+                    "skills:\n"
+                    "  - k8s-finder\n"
+                    "  - billing-labeler\n"
+                    "exclude:\n"
+                    "  - experimental-*\n",
+                )
+            )
+
+            updated = update_profile(
+                profile,
+                agent="claude",
+                add_skills=["release-checker", "k8s-finder"],
+                remove_skills=["billing-labeler"],
+                add_exclude=["legacy-*"],
+                remove_exclude=["experimental-*"],
+            )
+
+        self.assertEqual(updated.agent, "claude")
+        self.assertEqual(updated.skills, ["k8s-finder", "release-checker"])
+        self.assertEqual(updated.exclude, ["legacy-*"])
 
 
 def _write_fixture(path: Path, content: str) -> Path:

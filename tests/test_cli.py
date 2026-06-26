@@ -107,6 +107,45 @@ class CliTests(unittest.TestCase):
             self.assertIn("linked: k8s-finder", output.getvalue())
             self.assertTrue((root / "state" / "last-sync.json").is_file())
 
+    def test_sync_command_dry_run_does_not_write_links_or_state(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            skill = root / "skills" / "k8s-finder"
+            stale = root / "skills" / "old-skill"
+            skill.mkdir(parents=True)
+            stale.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("# skill", encoding="utf-8")
+            (stale / "SKILL.md").write_text("# stale", encoding="utf-8")
+            profile = root / "profiles" / "default.yaml"
+            profile.parent.mkdir(parents=True)
+            profile.write_text(
+                "name: default\nagent: codex\nskills:\n  - k8s-finder\n",
+                encoding="utf-8",
+            )
+            target = Path(temp_dir) / "target"
+            target.mkdir()
+            (target / "old-skill").symlink_to(stale, target_is_directory=True)
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "sync",
+                        "--root",
+                        str(root),
+                        "--target",
+                        str(target),
+                        "--dry-run",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertFalse((target / "k8s-finder").exists())
+            self.assertTrue((target / "old-skill").is_symlink())
+            self.assertFalse((root / "state" / "last-sync.json").exists())
+            self.assertIn("would-link: k8s-finder", output.getvalue())
+            self.assertIn("would-remove: old-skill", output.getvalue())
+
     def test_sync_command_records_removed_stale_links_in_state(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "workspace"
@@ -409,6 +448,58 @@ class CliTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertFalse((profiles / "default.yaml").exists())
             self.assertIn("removed:", output.getvalue())
+
+    def test_profile_update_command_updates_existing_profile(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            profiles = root / "profiles"
+            profiles.mkdir(parents=True)
+            (profiles / "default.yaml").write_text(
+                "name: default\n"
+                "agent: codex\n"
+                "skills:\n"
+                "  - k8s-finder\n"
+                "  - billing-labeler\n"
+                "exclude:\n"
+                "  - experimental-*\n",
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "profile",
+                        "update",
+                        "--root",
+                        str(root),
+                        "--name",
+                        "default",
+                        "--agent",
+                        "claude",
+                        "--add-skill",
+                        "release-checker",
+                        "--remove-skill",
+                        "billing-labeler",
+                        "--add-exclude",
+                        "legacy-*",
+                        "--remove-exclude",
+                        "experimental-*",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                (profiles / "default.yaml").read_text(encoding="utf-8"),
+                "name: default\n"
+                "agent: claude\n"
+                "skills:\n"
+                "  - k8s-finder\n"
+                "  - release-checker\n"
+                "exclude:\n"
+                "  - legacy-*\n",
+            )
+            self.assertIn("updated:", output.getvalue())
 
     def test_doctor_command_reports_missing_expected_links_from_state(self):
         with tempfile.TemporaryDirectory() as temp_dir:

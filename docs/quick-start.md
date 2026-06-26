@@ -58,6 +58,18 @@ To delete a profile:
 PYTHONPATH=src python3 -m skill_hub_manager.cli profile remove --root /Users/yup/.skill-hub --name default
 ```
 
+To incrementally update an existing profile:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile update --root /Users/yup/.skill-hub \
+  --name default \
+  --agent claude \
+  --add-skill release-checker \
+  --remove-skill billing-labeler \
+  --add-exclude legacy-* \
+  --remove-exclude experimental-*
+```
+
 ## 4. Build the registry
 
 ```bash
@@ -93,6 +105,14 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli profile show --root /Users/yup/.
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli sync --root /Users/yup/.skill-hub \
   --target /Users/yup/.codex/skills
+```
+
+Preview the sync plan first if needed:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli sync --root /Users/yup/.skill-hub \
+  --target /Users/yup/.codex/skills \
+  --dry-run
 ```
 
 This also writes `/Users/yup/.skill-hub/state/last-sync.json` so later checks can detect drift from the last successful sync.

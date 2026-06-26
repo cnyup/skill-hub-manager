@@ -66,6 +66,29 @@ class SyncTests(unittest.TestCase):
             self.assertEqual(result.removed, [])
             self.assertTrue((target / "notes.txt").is_file())
 
+    def test_sync_profile_dry_run_reports_changes_without_touching_target(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            vault = root / "vault"
+            current = vault / "k8s-finder"
+            stale = vault / "old-skill"
+            current.mkdir(parents=True)
+            stale.mkdir(parents=True)
+            (current / "SKILL.md").write_text("# current", encoding="utf-8")
+            (stale / "SKILL.md").write_text("# stale", encoding="utf-8")
+            target = root / "target"
+            target.mkdir()
+            (target / "old-skill").symlink_to(stale, target_is_directory=True)
+            profile = Profile(name="project-a", agent="codex", skills=["k8s-finder"])
+            skills = {"k8s-finder": Skill(name="k8s-finder", path=current)}
+
+            result = sync_profile(profile, skills, target, dry_run=True)
+
+            self.assertEqual(result.linked, ["k8s-finder"])
+            self.assertEqual(result.removed, ["old-skill"])
+            self.assertFalse((target / "k8s-finder").exists())
+            self.assertTrue((target / "old-skill").is_symlink())
+
     def test_write_sync_state_records_profile_and_results(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

@@ -50,6 +50,8 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli sync --root /Users/yup/.skill-hu
   --target /Users/yup/.codex/skills
 ```
 
+This also writes `/Users/yup/.skill-hub/state/last-sync.json` so later checks can detect drift from the last successful sync.
+
 You can also inspect the current vault contents:
 
 ```bash
@@ -63,6 +65,8 @@ Run the doctor or audit command to confirm all links resolve correctly.
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli doctor --root /Users/yup/.skill-hub
 ```
+
+`doctor --root` reads the last synced target from `state/last-sync.json`, then checks both broken symlinks and links that were present in the last sync record but are no longer present in that target directory.
 
 ## Local development
 

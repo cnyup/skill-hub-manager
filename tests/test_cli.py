@@ -105,6 +105,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertTrue((target / "k8s-finder").is_symlink())
             self.assertIn("linked: k8s-finder", output.getvalue())
+            self.assertTrue((root / "state" / "last-sync.json").is_file())
 
     def test_doctor_command_reports_broken_links(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -178,3 +179,28 @@ class CliTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertTrue(output_path.is_file())
             self.assertIn("k8s-finder:", output_path.read_text(encoding="utf-8"))
+
+    def test_doctor_command_reports_missing_expected_links_from_state(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            target = root / "skills"
+            target.mkdir(parents=True)
+            state = root / "state"
+            state.mkdir()
+            (state / "last-sync.json").write_text(
+                "{\n"
+                '  "profile": "default",\n'
+                '  "agent": "codex",\n'
+                '  "target": "/tmp/skills",\n'
+                '  "linked": ["k8s-finder"],\n'
+                '  "missing": []\n'
+                "}\n",
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["doctor", "--root", str(root)])
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn("expected-missing: k8s-finder", output.getvalue())

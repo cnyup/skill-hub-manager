@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,3 +27,22 @@ def sync_profile(profile: Profile, skills: dict[str, Skill], target: Path) -> Sy
         link.symlink_to(skill.path, target_is_directory=True)
         linked.append(skill_name)
     return SyncResult(linked=linked, missing=missing)
+
+
+def write_sync_state(
+    state_file: Path,
+    profile: Profile,
+    target: Path,
+    linked: list[str],
+    missing: list[str],
+) -> Path:
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    state = {
+        "profile": profile.name,
+        "agent": profile.agent,
+        "target": str(target),
+        "linked": linked,
+        "missing": missing,
+    }
+    state_file.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+    return state_file

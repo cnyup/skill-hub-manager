@@ -55,11 +55,13 @@ Scan the workspace vault:
 PYTHONPATH=src python3 -m skill_hub_manager.cli scan --root /Users/yup/.skill-hub
 ```
 
-Check for broken symlinks in the workspace skill directory:
+Check for broken symlinks in the last synced target:
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli doctor --root /Users/yup/.skill-hub
 ```
+
+When you run `sync --root`, the CLI also records the last sync result in `state/last-sync.json`. `doctor --root` uses that file to find the last synced target and report expected links that have disappeared since the last sync.
 
 ## Status
 

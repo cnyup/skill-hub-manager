@@ -2,12 +2,12 @@ import argparse
 from pathlib import Path
 
 from skill_hub_manager import __version__
-from skill_hub_manager.doctor import find_broken_links
+from skill_hub_manager.doctor import find_broken_links, find_missing_expected_links, load_sync_target
 from skill_hub_manager.paths import initialize_workspace, resolve_workspace_root, workspace_paths
 from skill_hub_manager.profiles import load_profile
 from skill_hub_manager.registry import write_registry
 from skill_hub_manager.skills import scan_skills
-from skill_hub_manager.sync import sync_profile
+from skill_hub_manager.sync import sync_profile, write_sync_state
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -64,17 +64,25 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "sync":
         vault, profile_path = _resolve_sync_paths(args)
         profile = load_profile(profile_path)
-        result = sync_profile(profile, scan_skills(vault), Path(args.target))
+        target = Path(args.target)
+        result = sync_profile(profile, scan_skills(vault), target)
+        if args.root:
+            paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
+            write_sync_state(paths.state / "last-sync.json", profile, target, result.linked, result.missing)
         for name in result.linked:
             print(f"linked: {name}")
         for name in result.missing:
             print(f"missing: {name}")
         return 1 if result.missing else 0
     if args.command == "doctor":
-        broken = find_broken_links(_resolve_doctor_target(args))
+        target = _resolve_doctor_target(args)
+        broken = find_broken_links(target)
+        expected_missing = _resolve_expected_missing(args, target)
         for name in broken:
             print(f"broken: {name}")
-        return 1 if broken else 0
+        for name in expected_missing:
+            print(f"expected-missing: {name}")
+        return 1 if broken or expected_missing else 0
     parser.print_help()
     return 0
 
@@ -106,7 +114,16 @@ def _resolve_sync_paths(args: argparse.Namespace) -> tuple[Path, Path]:
 def _resolve_doctor_target(args: argparse.Namespace) -> Path:
     if args.target:
         return Path(args.target)
-    return workspace_paths(resolve_workspace_root(_optional_path(args.root))).skills
+    paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
+    state_target = load_sync_target(paths.state / "last-sync.json")
+    return state_target if state_target is not None else paths.skills
+
+
+def _resolve_expected_missing(args: argparse.Namespace, target: Path) -> list[str]:
+    if not args.root:
+        return []
+    paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
+    return find_missing_expected_links(target, paths.state / "last-sync.json")
 
 
 def _optional_path(value: str | None) -> Path | None:

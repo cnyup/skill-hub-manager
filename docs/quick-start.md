@@ -23,6 +23,20 @@ Each skill should live in its own directory and contain a `SKILL.md`.
 
 ## 3. Create or edit a profile
 
+Prefer generating the profile through CLI so the file format stays consistent:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile add --root /Users/yup/.skill-hub \
+  --name default \
+  --agent codex \
+  --skill k8s-finder \
+  --skill billing-labeler \
+  --exclude billing-labeler \
+  --exclude experimental-*
+```
+
+The command writes `/Users/yup/.skill-hub/profiles/default.yaml`.
+
 Start with a simple allowlist:
 
 ```yaml
@@ -37,6 +51,12 @@ exclude:
 ```
 
 `exclude` supports explicit skill names and simple glob patterns such as `experimental-*`.
+
+To delete a profile:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile remove --root /Users/yup/.skill-hub --name default
+```
 
 ## 4. Build the registry
 

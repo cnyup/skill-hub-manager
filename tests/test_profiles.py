@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from skill_hub_manager.profiles import list_profiles, load_profile
+from skill_hub_manager.profiles import list_profiles, load_profile, remove_profile, write_profile
 
 
 class ProfileTests(unittest.TestCase):
@@ -68,3 +68,51 @@ class ProfileTests(unittest.TestCase):
             profiles = list_profiles(profiles_dir)
 
         self.assertEqual([path.name for path in profiles], ["alpha.yaml", "zebra.yaml"])
+
+    def test_write_profile_persists_deterministic_yaml(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            profiles_dir = Path(temp_dir)
+
+            path = write_profile(
+                profiles_dir,
+                load_profile(
+                    _write_fixture(
+                        profiles_dir / "input.yaml",
+                        "name: default\n"
+                        "agent: codex\n"
+                        "skills:\n"
+                        "  - billing-labeler\n"
+                        "  - k8s-finder\n"
+                        "exclude:\n"
+                        "  - experimental-*\n",
+                    )
+                ),
+            )
+
+            self.assertEqual(path, profiles_dir / "default.yaml")
+            self.assertEqual(
+                path.read_text(encoding="utf-8"),
+                "name: default\n"
+                "agent: codex\n"
+                "skills:\n"
+                "  - billing-labeler\n"
+                "  - k8s-finder\n"
+                "exclude:\n"
+                "  - experimental-*\n",
+            )
+
+    def test_remove_profile_deletes_existing_profile_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            profiles_dir = Path(temp_dir)
+            path = profiles_dir / "default.yaml"
+            path.write_text("name: default\nagent: codex\nskills:\n", encoding="utf-8")
+
+            removed = remove_profile(profiles_dir, "default")
+
+        self.assertTrue(removed)
+        self.assertFalse(path.exists())
+
+
+def _write_fixture(path: Path, content: str) -> Path:
+    path.write_text(content, encoding="utf-8")
+    return path

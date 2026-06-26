@@ -5,7 +5,7 @@ from skill_hub_manager import __version__
 from skill_hub_manager.audit import audit_profiles
 from skill_hub_manager.doctor import find_broken_links, find_missing_expected_links, load_sync_target
 from skill_hub_manager.paths import initialize_workspace, resolve_workspace_root, workspace_paths
-from skill_hub_manager.profiles import list_profiles, load_profile
+from skill_hub_manager.profiles import Profile, list_profiles, load_profile, remove_profile, write_profile
 from skill_hub_manager.registry import find_registry_entries, load_registry_entries, write_registry
 from skill_hub_manager.skills import scan_skills
 from skill_hub_manager.sync import sync_profile, write_sync_state
@@ -59,6 +59,17 @@ def build_parser() -> argparse.ArgumentParser:
     profile_show = profile_subparsers.add_parser("show")
     profile_show.add_argument("--root", required=True)
     profile_show.add_argument("--name", required=True)
+
+    profile_add = profile_subparsers.add_parser("add")
+    profile_add.add_argument("--root", required=True)
+    profile_add.add_argument("--name", required=True)
+    profile_add.add_argument("--agent", required=True)
+    profile_add.add_argument("--skill", action="append", required=True)
+    profile_add.add_argument("--exclude", action="append", default=[])
+
+    profile_remove = profile_subparsers.add_parser("remove")
+    profile_remove.add_argument("--root", required=True)
+    profile_remove.add_argument("--name", required=True)
 
     return parser
 
@@ -146,6 +157,27 @@ def main(argv: list[str] | None = None) -> int:
         print(f"exclude: [{', '.join(profile.exclude)}]")
         print(f"effective_skills: [{', '.join(profile.effective_skills())}]")
         return 0
+    if args.command == "profile" and args.profile_command == "add":
+        paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
+        path = write_profile(
+            paths.profiles,
+            Profile(
+                name=args.name,
+                agent=args.agent,
+                skills=args.skill,
+                exclude=args.exclude,
+            ),
+        )
+        print(f"wrote: {path}")
+        return 0
+    if args.command == "profile" and args.profile_command == "remove":
+        paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
+        removed = remove_profile(paths.profiles, args.name)
+        if removed:
+            print(f"removed: {paths.profiles / f'{args.name}.yaml'}")
+            return 0
+        print(f"missing: {paths.profiles / f'{args.name}.yaml'}")
+        return 1
     parser.print_help()
     return 0
 

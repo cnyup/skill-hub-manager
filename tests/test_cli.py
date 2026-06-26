@@ -354,6 +354,62 @@ class CliTests(unittest.TestCase):
             self.assertIn("agent: codex", rendered)
             self.assertIn("effective_skills: [k8s-finder]", rendered)
 
+    def test_profile_add_command_writes_profile_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "profile",
+                        "add",
+                        "--root",
+                        str(root),
+                        "--name",
+                        "default",
+                        "--agent",
+                        "codex",
+                        "--skill",
+                        "billing-labeler",
+                        "--skill",
+                        "k8s-finder",
+                        "--exclude",
+                        "experimental-*",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                (root / "profiles" / "default.yaml").read_text(encoding="utf-8"),
+                "name: default\n"
+                "agent: codex\n"
+                "skills:\n"
+                "  - billing-labeler\n"
+                "  - k8s-finder\n"
+                "exclude:\n"
+                "  - experimental-*\n",
+            )
+            self.assertIn("wrote:", output.getvalue())
+
+    def test_profile_remove_command_deletes_profile_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            profiles = root / "profiles"
+            profiles.mkdir(parents=True)
+            (profiles / "default.yaml").write_text(
+                "name: default\nagent: codex\nskills:\n  - k8s-finder\n",
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["profile", "remove", "--root", str(root), "--name", "default"])
+
+            self.assertEqual(exit_code, 0)
+            self.assertFalse((profiles / "default.yaml").exists())
+            self.assertIn("removed:", output.getvalue())
+
     def test_doctor_command_reports_missing_expected_links_from_state(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "workspace"

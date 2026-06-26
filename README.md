@@ -37,6 +37,8 @@ The MVP provides:
 - `skill-hub audit --root <path>`
 - `skill-hub profile list --root <path>`
 - `skill-hub profile show --root <path> --name <profile>`
+- `skill-hub profile add --root <path> --name <profile> --agent <agent> --skill <skill>`
+- `skill-hub profile remove --root <path> --name <profile>`
 - `skill-hub sync --root <path> --target <path>`
 - `skill-hub doctor --root <path>`
 
@@ -78,6 +80,19 @@ Inspect available profiles and their effective skills:
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli profile list --root /Users/yup/.skill-hub
 PYTHONPATH=src python3 -m skill_hub_manager.cli profile show --root /Users/yup/.skill-hub --name default
+```
+
+Create or remove profiles without hand-editing YAML:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile add --root /Users/yup/.skill-hub \
+  --name default \
+  --agent codex \
+  --skill billing-labeler \
+  --skill k8s-finder \
+  --exclude experimental-*
+
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile remove --root /Users/yup/.skill-hub --name default
 ```
 
 Check for broken symlinks in the last synced target:

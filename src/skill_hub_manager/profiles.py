@@ -34,6 +34,25 @@ def list_profiles(profiles_dir: Path) -> list[Path]:
     return sorted(path for path in profiles_dir.iterdir() if path.is_file() and path.suffix == ".yaml")
 
 
+def write_profile(profiles_dir: Path, profile: Profile) -> Path:
+    profiles_dir.mkdir(parents=True, exist_ok=True)
+    path = profile_path(profiles_dir, profile.name)
+    path.write_text(_render_profile(profile), encoding="utf-8")
+    return path
+
+
+def remove_profile(profiles_dir: Path, name: str) -> bool:
+    path = profile_path(profiles_dir, name)
+    if not path.exists():
+        return False
+    path.unlink()
+    return True
+
+
+def profile_path(profiles_dir: Path, name: str) -> Path:
+    return profiles_dir / f"{name}.yaml"
+
+
 def _parse_simple_profile_yaml(content: str) -> dict[str, str | list[str]]:
     data: dict[str, str | list[str]] = {}
     active_list: str | None = None
@@ -62,3 +81,16 @@ def _parse_simple_profile_yaml(content: str) -> dict[str, str | list[str]]:
             data[key] = []
             active_list = key
     return data
+
+
+def _render_profile(profile: Profile) -> str:
+    lines = [
+        f"name: {profile.name}",
+        f"agent: {profile.agent}",
+        "skills:",
+    ]
+    lines.extend(f"  - {skill}" for skill in profile.skills)
+    if profile.exclude:
+        lines.append("exclude:")
+        lines.extend(f"  - {pattern}" for pattern in profile.exclude)
+    return "\n".join(lines) + "\n"

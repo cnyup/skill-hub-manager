@@ -28,7 +28,26 @@ skills:
 
 Use the sync command to materialize symlinks into the target agent directory.
 
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli sync \
+  --vault /Users/yup/.skill-hub/skills \
+  --profile /Users/yup/.config/skill-hub/profiles/project-a.yaml \
+  --target /Users/yup/.codex/skills
+```
+
 ## 5. Verify
 
 Run the doctor or audit command to confirm all links resolve correctly.
 
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli doctor \
+  --target /Users/yup/.codex/skills
+```
+
+## Local development
+
+Run tests without external dependencies:
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests
+```

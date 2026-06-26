@@ -24,7 +24,21 @@ The real skill content lives in a local vault outside the repo, and this project
 - Local vault: real skills and private assets
 - Profiles: can be public or private depending on use
 
+## Current CLI
+
+The MVP provides:
+
+- `skill-hub --version`
+- `skill-hub scan --vault <path>`
+- `skill-hub sync --vault <path> --profile <profile.yaml> --target <path>`
+- `skill-hub doctor --target <path>`
+
+Run from a checkout without installing:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli scan --vault /Users/yup/.skill-hub/skills
+```
+
 ## Status
 
-Design work in progress.
-
+Local-first CLI MVP in progress. Code is not pushed unless explicitly requested.

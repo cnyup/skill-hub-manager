@@ -12,7 +12,21 @@ class RegistryTests(unittest.TestCase):
             vault = root / "skills"
             skill = vault / "k8s-finder"
             skill.mkdir(parents=True)
-            (skill / "SKILL.md").write_text("# skill", encoding="utf-8")
+            (skill / "SKILL.md").write_text(
+                "---\n"
+                "name: k8s-finder\n"
+                "description: Find Kubernetes services\n"
+                "visibility: team\n"
+                "agents:\n"
+                "  - codex\n"
+                "  - claude\n"
+                "tags:\n"
+                "  - infra\n"
+                "  - kubernetes\n"
+                "---\n"
+                "# skill\n",
+                encoding="utf-8",
+            )
             output = root / "state" / "registry.yaml"
 
             write_registry(vault, output)
@@ -21,3 +35,7 @@ class RegistryTests(unittest.TestCase):
             self.assertIn("skills:", content)
             self.assertIn("k8s-finder:", content)
             self.assertIn(str(skill), content)
+            self.assertIn("description: Find Kubernetes services", content)
+            self.assertIn("visibility: team", content)
+            self.assertIn("agents: [codex, claude]", content)
+            self.assertIn("tags: [infra, kubernetes]", content)

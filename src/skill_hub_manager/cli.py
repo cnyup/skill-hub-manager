@@ -36,7 +36,8 @@ def build_parser() -> argparse.ArgumentParser:
     sync.add_argument("--target", required=True)
 
     doctor = subparsers.add_parser("doctor")
-    doctor.add_argument("--target", required=True)
+    doctor.add_argument("--target")
+    doctor.add_argument("--root")
 
     return parser
 
@@ -70,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"missing: {name}")
         return 1 if result.missing else 0
     if args.command == "doctor":
-        broken = find_broken_links(Path(args.target))
+        broken = find_broken_links(_resolve_doctor_target(args))
         for name in broken:
             print(f"broken: {name}")
         return 1 if broken else 0
@@ -100,6 +101,12 @@ def _resolve_sync_paths(args: argparse.Namespace) -> tuple[Path, Path]:
     vault = Path(args.vault) if args.vault else paths.skills
     profile = Path(args.profile) if args.profile else paths.profiles / "default.yaml"
     return vault, profile
+
+
+def _resolve_doctor_target(args: argparse.Namespace) -> Path:
+    if args.target:
+        return Path(args.target)
+    return workspace_paths(resolve_workspace_root(_optional_path(args.root))).skills
 
 
 def _optional_path(value: str | None) -> Path | None:

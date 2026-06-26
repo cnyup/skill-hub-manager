@@ -33,7 +33,7 @@ The MVP provides:
 - `skill-hub registry build --root <path>`
 - `skill-hub scan --root <path>`
 - `skill-hub sync --root <path> --target <path>`
-- `skill-hub doctor --target <path>`
+- `skill-hub doctor --root <path>`
 
 Run from a checkout without installing:
 
@@ -47,10 +47,18 @@ Then build a registry from the local vault:
 PYTHONPATH=src python3 -m skill_hub_manager.cli registry build --root /Users/yup/.skill-hub
 ```
 
+The generated registry currently includes `path`, `description`, `visibility`, `agents`, and `tags` when those fields exist in `SKILL.md` frontmatter.
+
 Scan the workspace vault:
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli scan --root /Users/yup/.skill-hub
+```
+
+Check for broken symlinks in the workspace skill directory:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli doctor --root /Users/yup/.skill-hub
 ```
 
 ## Status

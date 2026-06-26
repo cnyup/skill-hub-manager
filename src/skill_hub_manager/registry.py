@@ -8,6 +8,10 @@ def build_registry(vault: Path) -> str:
     for name, skill in scan_skills(vault).items():
         lines.append(f"  {name}:")
         lines.append(f"    path: {skill.path}")
+        lines.append(f"    description: {skill.description}")
+        lines.append(f"    visibility: {skill.visibility}")
+        lines.append(f"    agents: [{', '.join(skill.agents)}]")
+        lines.append(f"    tags: [{', '.join(skill.tags)}]")
     lines.append("")
     return "\n".join(lines)
 

@@ -39,6 +39,8 @@ skills:
 PYTHONPATH=src python3 -m skill_hub_manager.cli registry build --root /Users/yup/.skill-hub
 ```
 
+This writes `/Users/yup/.skill-hub/state/registry.yaml` and records basic skill metadata from `SKILL.md` frontmatter.
+
 ## 5. Sync the profile
 
 Use the sync command to materialize symlinks into the target agent directory.
@@ -59,8 +61,7 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli scan --root /Users/yup/.skill-hu
 Run the doctor or audit command to confirm all links resolve correctly.
 
 ```bash
-PYTHONPATH=src python3 -m skill_hub_manager.cli doctor \
-  --target /Users/yup/.codex/skills
+PYTHONPATH=src python3 -m skill_hub_manager.cli doctor --root /Users/yup/.skill-hub
 ```
 
 ## Local development

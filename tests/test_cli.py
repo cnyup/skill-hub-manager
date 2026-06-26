@@ -268,6 +268,47 @@ class CliTests(unittest.TestCase):
             self.assertTrue(output_path.is_file())
             self.assertIn("k8s-finder:", output_path.read_text(encoding="utf-8"))
 
+    def test_profile_list_command_shows_workspace_profiles(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            profiles = root / "profiles"
+            profiles.mkdir(parents=True)
+            (profiles / "zebra.yaml").write_text("name: zebra\nagent: codex\nskills:\n", encoding="utf-8")
+            (profiles / "alpha.yaml").write_text("name: alpha\nagent: codex\nskills:\n", encoding="utf-8")
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["profile", "list", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(output.getvalue().strip().splitlines(), ["alpha", "zebra"])
+
+    def test_profile_show_command_prints_effective_skills(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            profiles = root / "profiles"
+            profiles.mkdir(parents=True)
+            (profiles / "default.yaml").write_text(
+                "name: default\n"
+                "agent: codex\n"
+                "skills:\n"
+                "  - k8s-finder\n"
+                "  - experimental-k8s\n"
+                "exclude:\n"
+                "  - experimental-*\n",
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["profile", "show", "--root", str(root), "--name", "default"])
+
+            self.assertEqual(exit_code, 0)
+            rendered = output.getvalue()
+            self.assertIn("name: default", rendered)
+            self.assertIn("agent: codex", rendered)
+            self.assertIn("effective_skills: [k8s-finder]", rendered)
+
     def test_doctor_command_reports_missing_expected_links_from_state(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "workspace"

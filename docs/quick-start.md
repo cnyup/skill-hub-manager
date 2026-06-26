@@ -50,6 +50,13 @@ This writes `/Users/yup/.skill-hub/state/registry.yaml` with stable ordering and
 
 Use the sync command to materialize symlinks into the target agent directory.
 
+Inspect the profile before syncing if needed:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile list --root /Users/yup/.skill-hub
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile show --root /Users/yup/.skill-hub --name default
+```
+
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli sync --root /Users/yup/.skill-hub \
   --target /Users/yup/.codex/skills

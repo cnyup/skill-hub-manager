@@ -32,6 +32,8 @@ The MVP provides:
 - `skill-hub init --root <path>`
 - `skill-hub registry build --root <path>`
 - `skill-hub scan --root <path>`
+- `skill-hub profile list --root <path>`
+- `skill-hub profile show --root <path> --name <profile>`
 - `skill-hub sync --root <path> --target <path>`
 - `skill-hub doctor --root <path>`
 
@@ -53,6 +55,13 @@ Scan the workspace vault:
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli scan --root /Users/yup/.skill-hub
+```
+
+Inspect available profiles and their effective skills:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile list --root /Users/yup/.skill-hub
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile show --root /Users/yup/.skill-hub --name default
 ```
 
 Check for broken symlinks in the last synced target:

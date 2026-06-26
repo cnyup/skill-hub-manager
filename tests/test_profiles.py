@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from skill_hub_manager.profiles import load_profile
+from skill_hub_manager.profiles import list_profiles, load_profile
 
 
 class ProfileTests(unittest.TestCase):
@@ -57,3 +57,14 @@ class ProfileTests(unittest.TestCase):
             profile = load_profile(path)
 
         self.assertEqual(profile.effective_skills(), ["k8s-finder"])
+
+    def test_list_profiles_returns_sorted_yaml_profiles(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            profiles_dir = Path(temp_dir)
+            (profiles_dir / "zebra.yaml").write_text("name: zebra\nagent: codex\nskills:\n", encoding="utf-8")
+            (profiles_dir / "alpha.yaml").write_text("name: alpha\nagent: codex\nskills:\n", encoding="utf-8")
+            (profiles_dir / "notes.txt").write_text("ignore", encoding="utf-8")
+
+            profiles = list_profiles(profiles_dir)
+
+        self.assertEqual([path.name for path in profiles], ["alpha.yaml", "zebra.yaml"])

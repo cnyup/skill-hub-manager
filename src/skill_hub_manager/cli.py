@@ -4,7 +4,7 @@ from pathlib import Path
 from skill_hub_manager import __version__
 from skill_hub_manager.doctor import find_broken_links, find_missing_expected_links, load_sync_target
 from skill_hub_manager.paths import initialize_workspace, resolve_workspace_root, workspace_paths
-from skill_hub_manager.profiles import load_profile
+from skill_hub_manager.profiles import list_profiles, load_profile
 from skill_hub_manager.registry import write_registry
 from skill_hub_manager.skills import scan_skills
 from skill_hub_manager.sync import sync_profile, write_sync_state
@@ -38,6 +38,16 @@ def build_parser() -> argparse.ArgumentParser:
     doctor = subparsers.add_parser("doctor")
     doctor.add_argument("--target")
     doctor.add_argument("--root")
+
+    profile = subparsers.add_parser("profile")
+    profile_subparsers = profile.add_subparsers(dest="profile_command")
+
+    profile_list = profile_subparsers.add_parser("list")
+    profile_list.add_argument("--root", required=True)
+
+    profile_show = profile_subparsers.add_parser("show")
+    profile_show.add_argument("--root", required=True)
+    profile_show.add_argument("--name", required=True)
 
     return parser
 
@@ -92,6 +102,20 @@ def main(argv: list[str] | None = None) -> int:
         for name in expected_missing:
             print(f"expected-missing: {name}")
         return 1 if broken or expected_missing else 0
+    if args.command == "profile" and args.profile_command == "list":
+        paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
+        for path in list_profiles(paths.profiles):
+            print(path.stem)
+        return 0
+    if args.command == "profile" and args.profile_command == "show":
+        paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
+        profile = load_profile(paths.profiles / f"{args.name}.yaml")
+        print(f"name: {profile.name}")
+        print(f"agent: {profile.agent}")
+        print(f"skills: [{', '.join(profile.skills)}]")
+        print(f"exclude: [{', '.join(profile.exclude)}]")
+        print(f"effective_skills: [{', '.join(profile.effective_skills())}]")
+        return 0
     parser.print_help()
     return 0
 

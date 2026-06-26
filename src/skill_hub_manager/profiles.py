@@ -28,6 +28,12 @@ def load_profile(path: Path) -> Profile:
     )
 
 
+def list_profiles(profiles_dir: Path) -> list[Path]:
+    if not profiles_dir.exists():
+        return []
+    return sorted(path for path in profiles_dir.iterdir() if path.is_file() and path.suffix == ".yaml")
+
+
 def _parse_simple_profile_yaml(content: str) -> dict[str, str | list[str]]:
     data: dict[str, str | list[str]] = {}
     active_list: str | None = None

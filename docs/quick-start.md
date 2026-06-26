@@ -26,7 +26,7 @@ Each skill should live in its own directory and contain a `SKILL.md`.
 Start with a simple allowlist:
 
 ```yaml
-name: project-a
+name: default
 agent: codex
 skills:
   - k8s-finder
@@ -36,9 +36,7 @@ skills:
 ## 4. Build the registry
 
 ```bash
-PYTHONPATH=src python3 -m skill_hub_manager.cli registry build \
-  --vault /Users/yup/.skill-hub/skills \
-  --output /Users/yup/.skill-hub/state/registry.yaml
+PYTHONPATH=src python3 -m skill_hub_manager.cli registry build --root /Users/yup/.skill-hub
 ```
 
 ## 5. Sync the profile
@@ -46,10 +44,14 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli registry build \
 Use the sync command to materialize symlinks into the target agent directory.
 
 ```bash
-PYTHONPATH=src python3 -m skill_hub_manager.cli sync \
-  --vault /Users/yup/.skill-hub/skills \
-  --profile /Users/yup/.skill-hub/profiles/project-a.yaml \
+PYTHONPATH=src python3 -m skill_hub_manager.cli sync --root /Users/yup/.skill-hub \
   --target /Users/yup/.codex/skills
+```
+
+You can also inspect the current vault contents:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli scan --root /Users/yup/.skill-hub
 ```
 
 ## 6. Verify

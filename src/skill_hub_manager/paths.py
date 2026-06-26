@@ -10,6 +10,10 @@ class WorkspacePaths:
     state: Path
 
 
+def default_workspace_root() -> Path:
+    return Path.home() / ".skill-hub"
+
+
 def workspace_paths(root: Path) -> WorkspacePaths:
     return WorkspacePaths(
         root=root,
@@ -33,3 +37,7 @@ def initialize_workspace(root: Path) -> WorkspacePaths:
         )
 
     return paths
+
+
+def resolve_workspace_root(root: Path | None) -> Path:
+    return root if root is not None else default_workspace_root()

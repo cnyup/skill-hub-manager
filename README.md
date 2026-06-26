@@ -30,9 +30,9 @@ The MVP provides:
 
 - `skill-hub --version`
 - `skill-hub init --root <path>`
-- `skill-hub registry build --vault <path> --output <path>`
-- `skill-hub scan --vault <path>`
-- `skill-hub sync --vault <path> --profile <profile.yaml> --target <path>`
+- `skill-hub registry build --root <path>`
+- `skill-hub scan --root <path>`
+- `skill-hub sync --root <path> --target <path>`
 - `skill-hub doctor --target <path>`
 
 Run from a checkout without installing:
@@ -44,9 +44,13 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli init --root /Users/yup/.skill-hu
 Then build a registry from the local vault:
 
 ```bash
-PYTHONPATH=src python3 -m skill_hub_manager.cli registry build \
-  --vault /Users/yup/.skill-hub/skills \
-  --output /Users/yup/.skill-hub/state/registry.yaml
+PYTHONPATH=src python3 -m skill_hub_manager.cli registry build --root /Users/yup/.skill-hub
+```
+
+Scan the workspace vault:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli scan --root /Users/yup/.skill-hub
 ```
 
 ## Status

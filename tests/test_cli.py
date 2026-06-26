@@ -31,6 +31,20 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("k8s-finder", output.getvalue())
 
+    def test_scan_command_uses_workspace_root(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            skill = root / "skills" / "k8s-finder"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("# skill", encoding="utf-8")
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["scan", "--root", str(root)])
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("k8s-finder", output.getvalue())
+
     def test_sync_command_links_profile_skills(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -53,6 +67,36 @@ class CliTests(unittest.TestCase):
                         str(root / "vault"),
                         "--profile",
                         str(profile),
+                        "--target",
+                        str(target),
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((target / "k8s-finder").is_symlink())
+            self.assertIn("linked: k8s-finder", output.getvalue())
+
+    def test_sync_command_uses_workspace_defaults(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            skill = root / "skills" / "k8s-finder"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("# skill", encoding="utf-8")
+            profile = root / "profiles" / "default.yaml"
+            profile.parent.mkdir(parents=True)
+            profile.write_text(
+                "name: default\nagent: codex\nskills:\n  - k8s-finder\n",
+                encoding="utf-8",
+            )
+            target = Path(temp_dir) / "target"
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "sync",
+                        "--root",
+                        str(root),
                         "--target",
                         str(target),
                     ]
@@ -118,3 +162,19 @@ class CliTests(unittest.TestCase):
             self.assertIn("skills:", output_path.read_text(encoding="utf-8"))
             self.assertIn("k8s-finder:", output_path.read_text(encoding="utf-8"))
             self.assertIn("wrote:", output.getvalue())
+
+    def test_registry_build_command_uses_workspace_defaults(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            skill = root / "skills" / "k8s-finder"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("# skill", encoding="utf-8")
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["registry", "build", "--root", str(root)])
+
+            output_path = root / "state" / "registry.yaml"
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(output_path.is_file())
+            self.assertIn("k8s-finder:", output_path.read_text(encoding="utf-8"))

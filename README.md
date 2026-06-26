@@ -34,6 +34,7 @@ The MVP provides:
 - `skill-hub scan --root <path>`
 - `skill-hub ls --root <path>`
 - `skill-hub find --root <path> --query <text>`
+- `skill-hub audit --root <path>`
 - `skill-hub profile list --root <path>`
 - `skill-hub profile show --root <path> --name <profile>`
 - `skill-hub sync --root <path> --target <path>`
@@ -64,6 +65,12 @@ Query the generated registry:
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli ls --root /Users/yup/.skill-hub
 PYTHONPATH=src python3 -m skill_hub_manager.cli find --root /Users/yup/.skill-hub --query kubernetes
+```
+
+Audit profile exposure against the current vault:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli audit --root /Users/yup/.skill-hub
 ```
 
 Inspect available profiles and their effective skills:

@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 
 from skill_hub_manager import __version__
+from skill_hub_manager.audit import audit_profiles
 from skill_hub_manager.doctor import find_broken_links, find_missing_expected_links, load_sync_target
 from skill_hub_manager.paths import initialize_workspace, resolve_workspace_root, workspace_paths
 from skill_hub_manager.profiles import list_profiles, load_profile
@@ -25,6 +26,9 @@ def build_parser() -> argparse.ArgumentParser:
     find_cmd = subparsers.add_parser("find")
     find_cmd.add_argument("--root", required=True)
     find_cmd.add_argument("--query", required=True)
+
+    audit_cmd = subparsers.add_parser("audit")
+    audit_cmd.add_argument("--root", required=True)
 
     init = subparsers.add_parser("init")
     init.add_argument("--root", required=True)
@@ -79,6 +83,14 @@ def main(argv: list[str] | None = None) -> int:
         entries = load_registry_entries(paths.state / "registry.yaml")
         for entry in find_registry_entries(entries, args.query):
             print(entry["name"])
+        return 0
+    if args.command == "audit":
+        paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
+        for report in audit_profiles(paths.profiles, paths.skills):
+            print(f"profile: {report['profile']}")
+            print(f"agent: {report['agent']}")
+            print(f"effective_skills: [{', '.join(report['effective_skills'])}]")
+            print(f"missing_skills: [{', '.join(report['missing_skills'])}]")
         return 0
     if args.command == "init":
         paths = initialize_workspace(Path(args.root))

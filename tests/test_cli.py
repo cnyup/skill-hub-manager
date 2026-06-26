@@ -378,3 +378,31 @@ class CliTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 1)
             self.assertIn("expected-missing: k8s-finder", output.getvalue())
+
+    def test_audit_command_reports_profile_skill_exposure(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            skills = root / "skills"
+            profiles = root / "profiles"
+            skills.mkdir(parents=True)
+            profiles.mkdir(parents=True)
+            (skills / "k8s-finder").mkdir()
+            (skills / "k8s-finder" / "SKILL.md").write_text("# skill", encoding="utf-8")
+            (profiles / "default.yaml").write_text(
+                "name: default\n"
+                "agent: codex\n"
+                "skills:\n"
+                "  - k8s-finder\n"
+                "  - missing-skill\n",
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["audit", "--root", str(root)])
+
+            rendered = output.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertIn("profile: default", rendered)
+            self.assertIn("effective_skills: [k8s-finder, missing-skill]", rendered)
+            self.assertIn("missing_skills: [missing-skill]", rendered)

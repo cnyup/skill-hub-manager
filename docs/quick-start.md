@@ -53,6 +53,12 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli ls --root /Users/yup/.skill-hub
 PYTHONPATH=src python3 -m skill_hub_manager.cli find --root /Users/yup/.skill-hub --query kubernetes
 ```
 
+You can also audit profiles against the current vault:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli audit --root /Users/yup/.skill-hub
+```
+
 ## 5. Sync the profile
 
 Use the sync command to materialize symlinks into the target agent directory.

@@ -3,5 +3,7 @@ agent: codex
 skills:
   - billing-labeler
   - k8s-finder
+  - experimental-k8s
 exclude:
   - billing-labeler
+  - experimental-*

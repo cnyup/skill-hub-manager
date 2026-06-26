@@ -33,9 +33,10 @@ skills:
   - billing-labeler
 exclude:
   - billing-labeler
+  - experimental-*
 ```
 
-`exclude` currently supports explicit skill names only.
+`exclude` supports explicit skill names and simple glob patterns such as `experimental-*`.
 
 ## 4. Build the registry
 

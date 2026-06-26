@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from fnmatch import fnmatch
 from pathlib import Path
 
 
@@ -10,8 +11,11 @@ class Profile:
     exclude: list[str] = field(default_factory=list)
 
     def effective_skills(self) -> list[str]:
-        excluded = set(self.exclude)
-        return [skill for skill in self.skills if skill not in excluded]
+        return [
+            skill
+            for skill in self.skills
+            if not any(fnmatch(skill, pattern) for pattern in self.exclude)
+        ]
 
 
 def load_profile(path: Path) -> Profile:

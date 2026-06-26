@@ -166,6 +166,35 @@ class CliTests(unittest.TestCase):
             self.assertTrue((target / "k8s-finder").is_symlink())
             self.assertFalse((target / "billing-labeler").exists())
 
+    def test_sync_command_respects_glob_profile_exclude(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            kept = root / "skills" / "k8s-finder"
+            experimental = root / "skills" / "experimental-k8s"
+            kept.mkdir(parents=True)
+            experimental.mkdir(parents=True)
+            (kept / "SKILL.md").write_text("# kept", encoding="utf-8")
+            (experimental / "SKILL.md").write_text("# excluded", encoding="utf-8")
+            profile = root / "profiles" / "default.yaml"
+            profile.parent.mkdir(parents=True)
+            profile.write_text(
+                "name: default\n"
+                "agent: codex\n"
+                "skills:\n"
+                "  - k8s-finder\n"
+                "  - experimental-k8s\n"
+                "exclude:\n"
+                "  - experimental-*\n",
+                encoding="utf-8",
+            )
+            target = Path(temp_dir) / "target"
+
+            exit_code = main(["sync", "--root", str(root), "--target", str(target)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((target / "k8s-finder").is_symlink())
+            self.assertFalse((target / "experimental-k8s").exists())
+
     def test_doctor_command_reports_broken_links(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

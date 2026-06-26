@@ -38,3 +38,22 @@ class ProfileTests(unittest.TestCase):
 
         self.assertEqual(profile.exclude, ["billing-labeler"])
         self.assertEqual(profile.effective_skills(), ["k8s-finder"])
+
+    def test_effective_skills_supports_simple_glob_excludes(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "project-a.yaml"
+            path.write_text(
+                "name: project-a\n"
+                "agent: codex\n"
+                "skills:\n"
+                "  - k8s-finder\n"
+                "  - experimental-k8s\n"
+                "  - experimental-feishu\n"
+                "exclude:\n"
+                "  - experimental-*\n",
+                encoding="utf-8",
+            )
+
+            profile = load_profile(path)
+
+        self.assertEqual(profile.effective_skills(), ["k8s-finder"])

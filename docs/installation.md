@@ -1,5 +1,7 @@
 # Installation
 
+[中文版本](installation.zh-CN.md)
+
 This project currently supports two practical ways to run `skill-hub`.
 
 ## Option 1: Wrapper Script From Checkout
@@ -51,6 +53,11 @@ In the current restricted environment used during development verification here,
 - outbound package index access was unavailable
 
 That affects installation verification in this environment, not the CLI runtime itself.
+
+In other words:
+
+- `./bin/skill-hub` is the verified path in the current repository environment
+- `pip install -e .` is the standard distribution path for normal Python workstations
 
 ## Recommended Local Workflow
 

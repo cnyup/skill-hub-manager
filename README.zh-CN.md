@@ -1,56 +1,56 @@
 # skill-hub-manager
 
-[中文版本](README.zh-CN.md)
+[English Version](README.md)
 
-Private skills manager for multi-agent, multi-project workflows.
+一个面向多 Agent、多项目工作流的私有 skills 管理器。
 
-This repository is intentionally public and does **not** contain the user's actual skills.
-The real skill content lives in a local vault outside the repo, and this project only manages:
+这个仓库刻意保持公开，但**不会**包含你真实的私有 skills。
+真实 skill 内容存放在仓库外部的本地 vault 中，这个项目只负责：
 
-- discovery
-- registry generation
-- profile-based access control
-- symlink-based syncing
-- audit and documentation
+- skills 发现
+- registry 生成
+- 基于 profile 的访问控制
+- 基于 symlink 的同步
+- 审计与文档
 
-## Core idea
+## 核心思路
 
-- Public GitHub repo: code, docs, templates, tests
-- Private local vault: actual `SKILL.md` content and any sensitive assets
-- Profiles: per-agent or per-project allowlists
-- Sync engine: materializes allowed skills into agent-specific target directories
+- 公共 GitHub 仓库：代码、文档、模板、测试
+- 私有本地 vault：真实 `SKILL.md` 和敏感资产
+- Profiles：按 agent 或项目定义 allowlist
+- Sync 引擎：把允许的 skills 落到各 agent 的目标目录
 
-## What lives where
+## 内容边界
 
-- GitHub: manager code, examples, schemas, docs, tests
-- Local vault: real skills and private assets
-- Profiles: can be public or private depending on use
+- GitHub：manager 代码、示例、schema、文档、测试
+- 本地 vault：真实 skills 和私有资产
+- Profiles：可根据需要选择公开或私有
 
-## Installation
+## 安装方式
 
-Two supported ways to run the CLI:
+目前支持两种运行方式：
 
-1. From a checkout, without Python packaging setup:
+1. 直接从代码仓库运行，不依赖 Python 打包安装：
 
 ```bash
 ./bin/skill-hub --version
 ./bin/skill-hub --help
 ```
 
-2. As an installed command on a normal Python workstation:
+2. 在正常 Python 工作站中安装为命令：
 
 ```bash
 python3 -m pip install -e .
 skill-hub --version
 ```
 
-The checkout wrapper path is the default recommendation because it has been verified in this repository's current development environment.
+当前仓库环境里，默认推荐直接使用 checkout wrapper，因为这条路径已经验证可用。
 
-The full installation notes are in [installation.md](docs/installation.md).
+完整安装说明见 [installation.zh-CN.md](docs/installation.zh-CN.md)。
 
-## Current CLI
+## 当前 CLI 能力
 
-The MVP provides:
+当前版本提供：
 
 - `skill-hub --version`
 - `skill-hub init --root <path>`
@@ -71,90 +71,102 @@ The MVP provides:
 - `skill-hub sync --root <path> --target <path> [--dry-run] [--json]`
 - `skill-hub doctor --root <path>`
 
-Run from a checkout without installing:
+## 从本地 checkout 直接运行
 
 ```bash
 ./bin/skill-hub init --root /Users/yup/.skill-hub
 ```
 
-Equivalent source-run form:
+等价的源码运行方式：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli init --root /Users/yup/.skill-hub
 ```
 
-Then build a registry from the local vault:
+## Registry 管理
+
+生成 registry：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli registry build --root /Users/yup/.skill-hub
 ```
 
-Check whether the saved registry still matches the current vault:
+检查当前 vault 和保存下来的 registry 是否漂移：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli registry doctor --root /Users/yup/.skill-hub
 ```
 
-`registry doctor` currently reports:
+当前 `registry doctor` 会报告：
 
 - `path-mismatch`
 - `stale-registry-skill`
 - `unregistered-skill`
 
-It also supports machine-readable output:
+机器可读输出：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli registry doctor --root /Users/yup/.skill-hub --json
 ```
 
-If drift is detected and you want to rewrite `state/registry.yaml` immediately:
+若检测到漂移并希望立即重建 `state/registry.yaml`：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli registry doctor --root /Users/yup/.skill-hub --rebuild-if-drift
 ```
 
-The generated registry currently uses stable skill-name ordering and includes `path`, `visibility`, and any non-empty `description`, `agents`, and `tags` fields from `SKILL.md` frontmatter.
+生成的 registry 会稳定按 skill 名排序，并包含 `SKILL.md` frontmatter 中的：
 
-Scan the workspace vault:
+- `path`
+- `visibility`
+- 非空的 `description`
+- 非空的 `agents`
+- 非空的 `tags`
+
+扫描 vault：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli scan --root /Users/yup/.skill-hub
 ```
 
-Query the generated registry:
+查询 registry：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli ls --root /Users/yup/.skill-hub
 PYTHONPATH=src python3 -m skill_hub_manager.cli find --root /Users/yup/.skill-hub --query kubernetes
 ```
 
-For machine-readable registry entry output:
+结构化输出：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli ls --root /Users/yup/.skill-hub --json
 PYTHONPATH=src python3 -m skill_hub_manager.cli find --root /Users/yup/.skill-hub --query kubernetes --json
 ```
 
-Audit profile exposure against the current vault:
+## 审计
+
+检查 profile 在当前 vault 下的暴露情况：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli audit --root /Users/yup/.skill-hub
 ```
 
-For machine-readable audit output:
+结构化输出：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli audit --root /Users/yup/.skill-hub --json
 ```
 
-Inspect available profiles and their effective skills:
+## Profile 管理
+
+查看 profile：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli profile list --root /Users/yup/.skill-hub
 PYTHONPATH=src python3 -m skill_hub_manager.cli profile show --root /Users/yup/.skill-hub --name default
 ```
 
-Create or remove profiles without hand-editing YAML:
+创建或删除 profile：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli profile add --root /Users/yup/.skill-hub \
@@ -167,7 +179,7 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli profile add --root /Users/yup/.s
 PYTHONPATH=src python3 -m skill_hub_manager.cli profile remove --root /Users/yup/.skill-hub --name default
 ```
 
-Incrementally update an existing profile:
+增量更新 profile：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli profile update --root /Users/yup/.skill-hub \
@@ -179,7 +191,7 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli profile update --root /Users/yup
   --remove-exclude experimental-*
 ```
 
-Clone or rename an existing profile:
+复制或重命名 profile：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli profile clone --root /Users/yup/.skill-hub \
@@ -191,32 +203,42 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli profile rename --root /Users/yup
   --to release
 ```
 
-Validate one profile or all profiles in the workspace:
+校验单个或全部 profile：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli profile validate --root /Users/yup/.skill-hub --name default
 PYTHONPATH=src python3 -m skill_hub_manager.cli profile validate --root /Users/yup/.skill-hub
 ```
 
-For automation, use JSON output:
+结构化输出：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli profile validate --root /Users/yup/.skill-hub --json
 ```
 
-`profile add`, `profile clone`, and `profile rename` now refuse to overwrite an existing target profile file.
+`profile add`、`profile clone`、`profile rename` 默认不会覆盖已存在的目标 profile 文件。
 
-Check for broken symlinks in the last synced target:
+## Sync 与诊断
+
+检查最后一次同步目标中的断链：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli doctor --root /Users/yup/.skill-hub
 ```
 
-When you run `sync --root`, the CLI also records the last sync result in `state/last-sync.json`. `doctor --root` uses that file to find the last synced target and report expected links that have disappeared since the last sync.
+`doctor --root` 会读取 `state/last-sync.json`，并检查：
 
-`sync` is now convergent for symlinks in the target directory: it removes stale symlink entries that are not part of the current profile, while leaving regular files untouched.
+- 已损坏的 symlink
+- 上一次同步记录中存在、但当前目标目录中已消失的链接
 
-Use dry-run before a real sync if you want a change preview without touching the target directory or sync state:
+执行同步：
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli sync --root /Users/yup/.skill-hub \
+  --target /Users/yup/.codex/skills
+```
+
+预览同步计划但不落盘：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli sync --root /Users/yup/.skill-hub \
@@ -224,7 +246,7 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli sync --root /Users/yup/.skill-hu
   --dry-run
 ```
 
-Use JSON output for automation or external tooling:
+结构化输出：
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli sync --root /Users/yup/.skill-hub \
@@ -232,8 +254,15 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli sync --root /Users/yup/.skill-hu
   --json
 ```
 
-Current JSON output contracts are documented in [json-output.md](docs/schema/json-output.md).
+当执行 `sync --root` 时，CLI 会写入 `state/last-sync.json`，方便后续 drift 检查。
 
-## Status
+当前 sync 行为是收敛式的：
 
-Local-first CLI MVP in progress. Code is not pushed unless explicitly requested.
+- 会删除目标目录中已不属于当前 profile 的陈旧 symlink
+- 不会修改普通文件
+
+当前所有 JSON 输出协议见 [json-output.md](docs/schema/json-output.md)。
+
+## 状态
+
+当前项目已经具备本地优先 CLI 的可交付能力。除非你明确要求，否则不会自动 push 代码。

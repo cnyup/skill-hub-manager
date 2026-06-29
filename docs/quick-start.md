@@ -1,8 +1,31 @@
 # Quick Start
 
+## 0. Choose How To Run The CLI
+
+From a local checkout, the simplest path is the bundled wrapper:
+
+```bash
+./bin/skill-hub --version
+```
+
+On a normal Python workstation, you can also install the command:
+
+```bash
+python3 -m pip install -e .
+skill-hub --version
+```
+
+More details are in `docs/installation.md`.
+
 ## 1. Initialize a local workspace
 
 Use a directory outside the GitHub repository:
+
+```bash
+./bin/skill-hub init --root /Users/yup/.skill-hub
+```
+
+Equivalent source-run form:
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli init --root /Users/yup/.skill-hub

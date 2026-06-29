@@ -24,6 +24,26 @@ The real skill content lives in a local vault outside the repo, and this project
 - Local vault: real skills and private assets
 - Profiles: can be public or private depending on use
 
+## Installation
+
+Two supported ways to run the CLI:
+
+1. From a checkout, without Python packaging setup:
+
+```bash
+./bin/skill-hub --version
+./bin/skill-hub --help
+```
+
+2. As an installed command on a normal Python workstation:
+
+```bash
+python3 -m pip install -e .
+skill-hub --version
+```
+
+The full installation notes are in [installation.md](/Users/yup/skill-hub-manager/docs/installation.md).
+
 ## Current CLI
 
 The MVP provides:
@@ -48,6 +68,12 @@ The MVP provides:
 - `skill-hub doctor --root <path>`
 
 Run from a checkout without installing:
+
+```bash
+./bin/skill-hub init --root /Users/yup/.skill-hub
+```
+
+Equivalent source-run form:
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli init --root /Users/yup/.skill-hub

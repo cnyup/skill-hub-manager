@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from skill_hub_manager.registry import build_registry, write_registry
+from skill_hub_manager.registry import build_registry, doctor_registry, write_registry
 
 
 class RegistryTests(unittest.TestCase):
@@ -73,3 +73,53 @@ class RegistryTests(unittest.TestCase):
         self.assertNotIn("description:", zebra_block.split("alpha-skill:", 1)[0] if "alpha-skill:" in zebra_block else zebra_block)
         self.assertNotIn("agents:", zebra_block)
         self.assertNotIn("tags:", zebra_block)
+
+    def test_doctor_registry_reports_unregistered_stale_and_path_mismatch(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            vault = root / "skills"
+            state = root / "state"
+            vault.mkdir(parents=True)
+            state.mkdir(parents=True)
+            active = vault / "k8s-finder"
+            new_skill = vault / "billing-labeler"
+            active.mkdir()
+            new_skill.mkdir()
+            (active / "SKILL.md").write_text("---\nname: k8s-finder\nvisibility: team\n---\n", encoding="utf-8")
+            (new_skill / "SKILL.md").write_text("---\nname: billing-labeler\nvisibility: private\n---\n", encoding="utf-8")
+            registry = state / "registry.yaml"
+            registry.write_text(
+                "skills:\n"
+                "  k8s-finder:\n"
+                "    path: /tmp/old-k8s-finder\n"
+                "    visibility: team\n"
+                "  stale-skill:\n"
+                "    path: /tmp/stale-skill\n"
+                "    visibility: private\n",
+                encoding="utf-8",
+            )
+
+            issues = doctor_registry(vault, registry)
+
+        self.assertEqual(
+            issues,
+            [
+                f"path-mismatch: k8s-finder registry=/tmp/old-k8s-finder vault={active}",
+                "stale-registry-skill: stale-skill",
+                "unregistered-skill: billing-labeler",
+            ],
+        )
+
+    def test_doctor_registry_passes_when_registry_matches_vault(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            vault = root / "skills"
+            registry = root / "state" / "registry.yaml"
+            skill = vault / "k8s-finder"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("---\nname: k8s-finder\nvisibility: team\n---\n", encoding="utf-8")
+            write_registry(vault, registry)
+
+            issues = doctor_registry(vault, registry)
+
+        self.assertEqual(issues, [])

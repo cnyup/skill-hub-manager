@@ -307,6 +307,57 @@ class CliTests(unittest.TestCase):
             self.assertTrue(output_path.is_file())
             self.assertIn("k8s-finder:", output_path.read_text(encoding="utf-8"))
 
+    def test_registry_doctor_command_reports_registry_drift(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            skills = root / "skills"
+            state = root / "state"
+            skills.mkdir(parents=True)
+            state.mkdir(parents=True)
+            current = skills / "k8s-finder"
+            current.mkdir()
+            (current / "SKILL.md").write_text("---\nname: k8s-finder\nvisibility: team\n---\n", encoding="utf-8")
+            (skills / "billing-labeler").mkdir()
+            (skills / "billing-labeler" / "SKILL.md").write_text(
+                "---\nname: billing-labeler\nvisibility: private\n---\n",
+                encoding="utf-8",
+            )
+            (state / "registry.yaml").write_text(
+                "skills:\n"
+                "  k8s-finder:\n"
+                "    path: /tmp/old-k8s-finder\n"
+                "    visibility: team\n"
+                "  stale-skill:\n"
+                "    path: /tmp/stale-skill\n"
+                "    visibility: private\n",
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["registry", "doctor", "--root", str(root)])
+
+            rendered = output.getvalue()
+            self.assertEqual(exit_code, 1)
+            self.assertIn("path-mismatch: k8s-finder", rendered)
+            self.assertIn("stale-registry-skill: stale-skill", rendered)
+            self.assertIn("unregistered-skill: billing-labeler", rendered)
+
+    def test_registry_doctor_command_passes_when_registry_matches_vault(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            skill = root / "skills" / "k8s-finder"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("---\nname: k8s-finder\nvisibility: team\n---\n", encoding="utf-8")
+            main(["registry", "build", "--root", str(root)])
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["registry", "doctor", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("ok: registry", output.getvalue())
+
     def test_ls_command_prints_registry_names(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "workspace"

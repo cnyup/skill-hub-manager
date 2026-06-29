@@ -16,7 +16,7 @@ from skill_hub_manager.profiles import (
     validate_profile,
     write_profile,
 )
-from skill_hub_manager.registry import find_registry_entries, load_registry_entries, write_registry
+from skill_hub_manager.registry import doctor_registry, find_registry_entries, load_registry_entries, write_registry
 from skill_hub_manager.skills import scan_skills
 from skill_hub_manager.sync import sync_profile, write_sync_state
 
@@ -49,6 +49,11 @@ def build_parser() -> argparse.ArgumentParser:
     registry_build.add_argument("--vault")
     registry_build.add_argument("--output")
     registry_build.add_argument("--root")
+
+    registry_doctor = registry_subparsers.add_parser("doctor")
+    registry_doctor.add_argument("--vault")
+    registry_doctor.add_argument("--output")
+    registry_doctor.add_argument("--root")
 
     sync = subparsers.add_parser("sync")
     sync.add_argument("--vault")
@@ -146,6 +151,15 @@ def main(argv: list[str] | None = None) -> int:
         output = write_registry(vault, output_path)
         print(f"wrote: {output}")
         return 0
+    if args.command == "registry" and args.registry_command == "doctor":
+        vault, output_path = _resolve_registry_paths(args)
+        issues = doctor_registry(vault, output_path)
+        if not issues:
+            print("ok: registry")
+            return 0
+        for issue in issues:
+            print(issue)
+        return 1
     if args.command == "sync":
         vault, profile_path = _resolve_sync_paths(args)
         profile = load_profile(profile_path)

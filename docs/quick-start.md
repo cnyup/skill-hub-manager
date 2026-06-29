@@ -106,6 +106,12 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli ls --root /Users/yup/.skill-hub
 PYTHONPATH=src python3 -m skill_hub_manager.cli find --root /Users/yup/.skill-hub --query kubernetes
 ```
 
+You can also check whether `state/registry.yaml` has drifted from the current vault:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli registry doctor --root /Users/yup/.skill-hub
+```
+
 You can also audit profiles against the current vault:
 
 ```bash

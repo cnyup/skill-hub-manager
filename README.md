@@ -31,6 +31,7 @@ The MVP provides:
 - `skill-hub --version`
 - `skill-hub init --root <path>`
 - `skill-hub registry build --root <path>`
+- `skill-hub registry doctor --root <path>`
 - `skill-hub scan --root <path>`
 - `skill-hub ls --root <path>`
 - `skill-hub find --root <path> --query <text>`
@@ -57,6 +58,18 @@ Then build a registry from the local vault:
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli registry build --root /Users/yup/.skill-hub
 ```
+
+Check whether the saved registry still matches the current vault:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli registry doctor --root /Users/yup/.skill-hub
+```
+
+`registry doctor` currently reports:
+
+- `path-mismatch`
+- `stale-registry-skill`
+- `unregistered-skill`
 
 The generated registry currently uses stable skill-name ordering and includes `path`, `visibility`, and any non-empty `description`, `agents`, and `tags` fields from `SKILL.md` frontmatter.
 

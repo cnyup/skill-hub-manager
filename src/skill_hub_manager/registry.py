@@ -46,60 +46,8 @@ def load_registry_entries(registry_file: Path) -> list[dict[str, str | list[str]
         if value.startswith("[") and value.endswith("]"):
             inner = value[1:-1].strip()
             current[key] = [] if not inner else [item.strip() for item in inner.split(",")]
-        else:
-            current[key] = value
-    return entries
-
-
-def find_registry_entries(
-    entries: list[dict[str, str | list[str]]],
-    query: str,
-) -> list[dict[str, str | list[str]]]:
-    needle = query.casefold()
-    matched: list[dict[str, str | list[str]]] = []
-    for entry in entries:
-        fields: list[str] = []
-        for key in ("name", "description", "path", "visibility"):
-            value = entry.get(key)
-            if isinstance(value, str):
-                fields.append(value)
-        for key in ("agents", "tags"):
-            value = entry.get(key)
-            if isinstance(value, list):
-                fields.extend(str(item) for item in value)
-        if any(needle in field.casefold() for field in fields):
-            matched.append(entry)
-    return matched
-
-
-def load_registry_entries(registry_file: Path) -> list[dict[str, str | list[str]]]:
-    if not registry_file.exists():
-        return []
-
-    entries: list[dict[str, str | list[str]]] = []
-    current: dict[str, str | list[str]] | None = None
-    active_list_key: str | None = None
-    for raw_line in registry_file.read_text(encoding="utf-8").splitlines():
-        line = raw_line.rstrip()
-        if line == "skills:" or not line.strip():
             continue
-        if line.startswith("  ") and not line.startswith("    "):
-            name = line.strip().removesuffix(":")
-            current = {"name": name}
-            entries.append(current)
-            active_list_key = None
-            continue
-        if current is None or not line.startswith("    "):
-            continue
-        key, value = line.strip().split(":", 1)
-        value = value.strip()
-        if value.startswith("[") and value.endswith("]"):
-            inner = value[1:-1].strip()
-            current[key] = [] if not inner else [item.strip() for item in inner.split(",")]
-            active_list_key = None
-        else:
-            current[key] = value
-            active_list_key = key
+        current[key] = value
     return entries
 
 
@@ -122,3 +70,29 @@ def find_registry_entries(
         if any(needle in haystack.casefold() for haystack in haystacks):
             matches.append(entry)
     return matches
+
+
+def doctor_registry(vault: Path, registry_file: Path) -> list[str]:
+    scanned = scan_skills(vault)
+    registry_entries = load_registry_entries(registry_file)
+    registry_by_name = {str(entry["name"]): entry for entry in registry_entries}
+    issues: list[str] = []
+
+    scanned_names = set(scanned)
+    registry_names = set(registry_by_name)
+
+    for name in sorted(scanned_names & registry_names):
+        registry_path = registry_by_name[name].get("path")
+        vault_path = str(scanned[name].path)
+        if isinstance(registry_path, str) and registry_path != vault_path:
+            issues.append(f"path-mismatch: {name} registry={registry_path} vault={vault_path}")
+
+    for name in sorted(registry_by_name):
+        if name not in scanned_names:
+            issues.append(f"stale-registry-skill: {name}")
+
+    for name in sorted(scanned):
+        if name not in registry_names:
+            issues.append(f"unregistered-skill: {name}")
+
+    return issues

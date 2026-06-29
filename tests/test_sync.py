@@ -4,7 +4,7 @@ from pathlib import Path
 
 from skill_hub_manager.profiles import Profile
 from skill_hub_manager.skills import Skill
-from skill_hub_manager.sync import sync_profile, write_sync_state
+from skill_hub_manager.sync import render_sync_result_json, sync_profile, write_sync_state
 
 
 class SyncTests(unittest.TestCase):
@@ -110,3 +110,33 @@ class SyncTests(unittest.TestCase):
             self.assertIn('"linked": [', content)
             self.assertIn('"missing": [', content)
             self.assertIn('"removed": [', content)
+
+    def test_render_sync_result_json_returns_stable_payload(self):
+        profile = Profile(name="default", agent="codex", skills=["k8s-finder"])
+        result = render_sync_result_json(
+            profile=profile,
+            target=Path("/tmp/skills"),
+            linked=["k8s-finder"],
+            missing=["missing-skill"],
+            removed=["old-skill"],
+            dry_run=True,
+        )
+
+        self.assertEqual(
+            result,
+            '{\n'
+            '  "mode": "dry-run",\n'
+            '  "profile": "default",\n'
+            '  "agent": "codex",\n'
+            '  "target": "/tmp/skills",\n'
+            '  "linked": [\n'
+            '    "k8s-finder"\n'
+            '  ],\n'
+            '  "missing": [\n'
+            '    "missing-skill"\n'
+            '  ],\n'
+            '  "removed": [\n'
+            '    "old-skill"\n'
+            '  ]\n'
+            '}',
+        )

@@ -18,7 +18,7 @@ from skill_hub_manager.profiles import (
 )
 from skill_hub_manager.registry import doctor_registry, find_registry_entries, load_registry_entries, write_registry
 from skill_hub_manager.skills import scan_skills
-from skill_hub_manager.sync import sync_profile, write_sync_state
+from skill_hub_manager.sync import render_sync_result_json, sync_profile, write_sync_state
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -61,6 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
     sync.add_argument("--root")
     sync.add_argument("--target", required=True)
     sync.add_argument("--dry-run", action="store_true")
+    sync.add_argument("--json", action="store_true")
 
     doctor = subparsers.add_parser("doctor")
     doctor.add_argument("--target")
@@ -175,6 +176,18 @@ def main(argv: list[str] | None = None) -> int:
                 result.missing,
                 result.removed,
             )
+        if args.json:
+            print(
+                render_sync_result_json(
+                    profile=profile,
+                    target=target,
+                    linked=result.linked,
+                    missing=result.missing,
+                    removed=result.removed,
+                    dry_run=args.dry_run,
+                )
+            )
+            return 1 if result.missing else 0
         if args.dry_run:
             for name in result.linked:
                 print(f"would-link: {name}")

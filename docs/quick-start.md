@@ -142,6 +142,14 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli sync --root /Users/yup/.skill-hu
   --dry-run
 ```
 
+If you want machine-readable sync results for scripts or future UI integration:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli sync --root /Users/yup/.skill-hub \
+  --target /Users/yup/.codex/skills \
+  --json
+```
+
 This also writes `/Users/yup/.skill-hub/state/last-sync.json` so later checks can detect drift from the last successful sync.
 
 During sync, stale symlink entries in the target that are no longer part of the current profile are removed automatically. Regular files in the target are not modified.

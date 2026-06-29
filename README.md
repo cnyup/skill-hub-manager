@@ -44,7 +44,7 @@ The MVP provides:
 - `skill-hub profile rename --root <path> --name <profile> --to <profile>`
 - `skill-hub profile validate --root <path> [--name <profile>]`
 - `skill-hub profile remove --root <path> --name <profile>`
-- `skill-hub sync --root <path> --target <path> [--dry-run]`
+- `skill-hub sync --root <path> --target <path> [--dry-run] [--json]`
 - `skill-hub doctor --root <path>`
 
 Run from a checkout without installing:
@@ -161,6 +161,14 @@ Use dry-run before a real sync if you want a change preview without touching the
 PYTHONPATH=src python3 -m skill_hub_manager.cli sync --root /Users/yup/.skill-hub \
   --target /Users/yup/.codex/skills \
   --dry-run
+```
+
+Use JSON output for automation or external tooling:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli sync --root /Users/yup/.skill-hub \
+  --target /Users/yup/.codex/skills \
+  --json
 ```
 
 ## Status

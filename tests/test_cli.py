@@ -1,5 +1,6 @@
 import contextlib
 import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -145,6 +146,67 @@ class CliTests(unittest.TestCase):
             self.assertFalse((root / "state" / "last-sync.json").exists())
             self.assertIn("would-link: k8s-finder", output.getvalue())
             self.assertIn("would-remove: old-skill", output.getvalue())
+
+    def test_sync_command_json_outputs_machine_readable_apply_result(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            skill = root / "skills" / "k8s-finder"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("# skill", encoding="utf-8")
+            profile = root / "profiles" / "default.yaml"
+            profile.parent.mkdir(parents=True)
+            profile.write_text(
+                "name: default\nagent: codex\nskills:\n  - k8s-finder\n",
+                encoding="utf-8",
+            )
+            target = Path(temp_dir) / "target"
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["sync", "--root", str(root), "--target", str(target), "--json"])
+
+            payload = json.loads(output.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["mode"], "apply")
+            self.assertEqual(payload["profile"], "default")
+            self.assertEqual(payload["agent"], "codex")
+            self.assertEqual(payload["target"], str(target))
+            self.assertEqual(payload["linked"], ["k8s-finder"])
+            self.assertEqual(payload["missing"], [])
+            self.assertEqual(payload["removed"], [])
+
+    def test_sync_command_json_outputs_machine_readable_dry_run_result(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            skill = root / "skills" / "k8s-finder"
+            stale = root / "skills" / "old-skill"
+            skill.mkdir(parents=True)
+            stale.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("# skill", encoding="utf-8")
+            (stale / "SKILL.md").write_text("# stale", encoding="utf-8")
+            profile = root / "profiles" / "default.yaml"
+            profile.parent.mkdir(parents=True)
+            profile.write_text(
+                "name: default\nagent: codex\nskills:\n  - k8s-finder\n",
+                encoding="utf-8",
+            )
+            target = Path(temp_dir) / "target"
+            target.mkdir()
+            (target / "old-skill").symlink_to(stale, target_is_directory=True)
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    ["sync", "--root", str(root), "--target", str(target), "--dry-run", "--json"]
+                )
+
+            payload = json.loads(output.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["mode"], "dry-run")
+            self.assertEqual(payload["linked"], ["k8s-finder"])
+            self.assertEqual(payload["missing"], [])
+            self.assertEqual(payload["removed"], ["old-skill"])
+            self.assertFalse((root / "state" / "last-sync.json").exists())
 
     def test_sync_command_records_removed_stale_links_in_state(self):
         with tempfile.TemporaryDirectory() as temp_dir:

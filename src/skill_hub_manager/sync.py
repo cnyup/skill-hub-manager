@@ -61,3 +61,23 @@ def write_sync_state(
     }
     state_file.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
     return state_file
+
+
+def render_sync_result_json(
+    profile: Profile,
+    target: Path,
+    linked: list[str],
+    missing: list[str],
+    removed: list[str],
+    dry_run: bool,
+) -> str:
+    payload = {
+        "mode": "dry-run" if dry_run else "apply",
+        "profile": profile.name,
+        "agent": profile.agent,
+        "target": str(target),
+        "linked": linked,
+        "missing": missing,
+        "removed": removed,
+    }
+    return json.dumps(payload, indent=2)

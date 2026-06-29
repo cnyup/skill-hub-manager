@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from skill_hub_manager.profiles import list_profiles, load_profile
@@ -20,3 +21,7 @@ def audit_profiles(profiles_dir: Path, skills_dir: Path) -> list[dict[str, str |
             }
         )
     return reports
+
+
+def render_audit_json(reports: list[dict[str, str | list[str]]]) -> str:
+    return json.dumps({"profiles": reports}, indent=2)

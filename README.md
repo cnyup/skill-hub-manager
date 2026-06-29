@@ -31,11 +31,11 @@ The MVP provides:
 - `skill-hub --version`
 - `skill-hub init --root <path>`
 - `skill-hub registry build --root <path>`
-- `skill-hub registry doctor --root <path>`
+- `skill-hub registry doctor --root <path> [--json] [--rebuild-if-drift]`
 - `skill-hub scan --root <path>`
-- `skill-hub ls --root <path>`
-- `skill-hub find --root <path> --query <text>`
-- `skill-hub audit --root <path>`
+- `skill-hub ls --root <path> [--json]`
+- `skill-hub find --root <path> --query <text> [--json]`
+- `skill-hub audit --root <path> [--json]`
 - `skill-hub profile list --root <path>`
 - `skill-hub profile show --root <path> --name <profile>`
 - `skill-hub profile add --root <path> --name <profile> --agent <agent> --skill <skill>`
@@ -77,6 +77,12 @@ It also supports machine-readable output:
 PYTHONPATH=src python3 -m skill_hub_manager.cli registry doctor --root /Users/yup/.skill-hub --json
 ```
 
+If drift is detected and you want to rewrite `state/registry.yaml` immediately:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli registry doctor --root /Users/yup/.skill-hub --rebuild-if-drift
+```
+
 The generated registry currently uses stable skill-name ordering and includes `path`, `visibility`, and any non-empty `description`, `agents`, and `tags` fields from `SKILL.md` frontmatter.
 
 Scan the workspace vault:
@@ -92,10 +98,23 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli ls --root /Users/yup/.skill-hub
 PYTHONPATH=src python3 -m skill_hub_manager.cli find --root /Users/yup/.skill-hub --query kubernetes
 ```
 
+For machine-readable registry entry output:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli ls --root /Users/yup/.skill-hub --json
+PYTHONPATH=src python3 -m skill_hub_manager.cli find --root /Users/yup/.skill-hub --query kubernetes --json
+```
+
 Audit profile exposure against the current vault:
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli audit --root /Users/yup/.skill-hub
+```
+
+For machine-readable audit output:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli audit --root /Users/yup/.skill-hub --json
 ```
 
 Inspect available profiles and their effective skills:
@@ -182,6 +201,8 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli sync --root /Users/yup/.skill-hu
   --target /Users/yup/.codex/skills \
   --json
 ```
+
+Current JSON output contracts are documented in [docs/schema/json-output.md](/Users/yup/skill-hub-manager/docs/schema/json-output.md).
 
 ## Status
 

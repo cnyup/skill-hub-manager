@@ -2,7 +2,7 @@ import argparse
 from pathlib import Path
 
 from skill_hub_manager import __version__
-from skill_hub_manager.audit import audit_profiles
+from skill_hub_manager.audit import audit_profiles, render_audit_json
 from skill_hub_manager.doctor import find_broken_links, find_missing_expected_links, load_sync_target
 from skill_hub_manager.paths import initialize_workspace, resolve_workspace_root, workspace_paths
 from skill_hub_manager.profiles import (
@@ -22,6 +22,7 @@ from skill_hub_manager.registry import (
     find_registry_entries,
     load_registry_entries,
     render_registry_doctor_json,
+    render_registry_entries_json,
     write_registry,
 )
 from skill_hub_manager.skills import scan_skills
@@ -39,13 +40,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     ls_cmd = subparsers.add_parser("ls")
     ls_cmd.add_argument("--root", required=True)
+    ls_cmd.add_argument("--json", action="store_true")
 
     find_cmd = subparsers.add_parser("find")
     find_cmd.add_argument("--root", required=True)
     find_cmd.add_argument("--query", required=True)
+    find_cmd.add_argument("--json", action="store_true")
 
     audit_cmd = subparsers.add_parser("audit")
     audit_cmd.add_argument("--root", required=True)
+    audit_cmd.add_argument("--json", action="store_true")
 
     init = subparsers.add_parser("init")
     init.add_argument("--root", required=True)
@@ -62,6 +66,7 @@ def build_parser() -> argparse.ArgumentParser:
     registry_doctor.add_argument("--output")
     registry_doctor.add_argument("--root")
     registry_doctor.add_argument("--json", action="store_true")
+    registry_doctor.add_argument("--rebuild-if-drift", action="store_true")
 
     sync = subparsers.add_parser("sync")
     sync.add_argument("--vault")
@@ -135,18 +140,30 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "ls":
         paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
-        for entry in load_registry_entries(paths.state / "registry.yaml"):
+        entries = load_registry_entries(paths.state / "registry.yaml")
+        if args.json:
+            print(render_registry_entries_json(entries))
+            return 0
+        for entry in entries:
             print(entry["name"])
         return 0
     if args.command == "find":
         paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
         entries = load_registry_entries(paths.state / "registry.yaml")
-        for entry in find_registry_entries(entries, args.query):
+        matches = find_registry_entries(entries, args.query)
+        if args.json:
+            print(render_registry_entries_json(matches))
+            return 0
+        for entry in matches:
             print(entry["name"])
         return 0
     if args.command == "audit":
         paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
-        for report in audit_profiles(paths.profiles, paths.skills):
+        reports = audit_profiles(paths.profiles, paths.skills)
+        if args.json:
+            print(render_audit_json(reports))
+            return 0
+        for report in reports:
             print(f"profile: {report['profile']}")
             print(f"agent: {report['agent']}")
             print(f"effective_skills: [{', '.join(report['effective_skills'])}]")
@@ -164,6 +181,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "registry" and args.registry_command == "doctor":
         vault, output_path = _resolve_registry_paths(args)
         issues = doctor_registry(vault, output_path)
+        if issues and args.rebuild_if_drift:
+            output = write_registry(vault, output_path)
+            if args.json:
+                print(render_registry_doctor_json([]))
+                return 0
+            print(f"rebuilt: {output}")
+            return 0
         if args.json:
             print(render_registry_doctor_json(issues))
             return 1 if issues else 0

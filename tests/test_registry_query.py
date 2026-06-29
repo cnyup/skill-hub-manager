@@ -2,7 +2,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from skill_hub_manager.registry import find_registry_entries, load_registry_entries, write_registry
+from skill_hub_manager.registry import (
+    find_registry_entries,
+    load_registry_entries,
+    render_registry_entries_json,
+    write_registry,
+)
 
 
 class RegistryQueryTests(unittest.TestCase):
@@ -52,3 +57,38 @@ class RegistryQueryTests(unittest.TestCase):
         matches = find_registry_entries(entries, "kubernetes")
 
         self.assertEqual([entry["name"] for entry in matches], ["k8s-finder"])
+
+    def test_render_registry_entries_json_returns_stable_payload(self):
+        rendered = render_registry_entries_json(
+            [
+                {
+                    "name": "k8s-finder",
+                    "path": "/tmp/k8s-finder",
+                    "visibility": "team",
+                    "description": "Find Kubernetes services",
+                    "agents": ["codex"],
+                    "tags": ["infra", "kubernetes"],
+                }
+            ]
+        )
+
+        self.assertEqual(
+            rendered,
+            '{\n'
+            '  "skills": [\n'
+            '    {\n'
+            '      "name": "k8s-finder",\n'
+            '      "path": "/tmp/k8s-finder",\n'
+            '      "visibility": "team",\n'
+            '      "description": "Find Kubernetes services",\n'
+            '      "agents": [\n'
+            '        "codex"\n'
+            '      ],\n'
+            '      "tags": [\n'
+            '        "infra",\n'
+            '        "kubernetes"\n'
+            '      ]\n'
+            '    }\n'
+            '  ]\n'
+            '}',
+        )

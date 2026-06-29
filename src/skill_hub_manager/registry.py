@@ -73,6 +73,10 @@ def find_registry_entries(
     return matches
 
 
+def render_registry_entries_json(entries: list[dict[str, str | list[str]]]) -> str:
+    return json.dumps({"skills": entries}, indent=2)
+
+
 def doctor_registry(vault: Path, registry_file: Path) -> list[str]:
     scanned = scan_skills(vault)
     registry_entries = load_registry_entries(registry_file)

@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from skill_hub_manager.audit import audit_profiles
+from skill_hub_manager.audit import audit_profiles, render_audit_json
 
 
 class AuditTests(unittest.TestCase):
@@ -32,3 +32,33 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(report["agent"], "codex")
         self.assertEqual(report["effective_skills"], ["k8s-finder", "missing-skill"])
         self.assertEqual(report["missing_skills"], ["missing-skill"])
+
+    def test_render_audit_json_returns_stable_payload(self):
+        rendered = render_audit_json(
+            [
+                {
+                    "profile": "default",
+                    "agent": "codex",
+                    "effective_skills": ["k8s-finder"],
+                    "missing_skills": ["missing-skill"],
+                }
+            ]
+        )
+
+        self.assertEqual(
+            rendered,
+            '{\n'
+            '  "profiles": [\n'
+            '    {\n'
+            '      "profile": "default",\n'
+            '      "agent": "codex",\n'
+            '      "effective_skills": [\n'
+            '        "k8s-finder"\n'
+            '      ],\n'
+            '      "missing_skills": [\n'
+            '        "missing-skill"\n'
+            '      ]\n'
+            '    }\n'
+            '  ]\n'
+            '}',
+        )

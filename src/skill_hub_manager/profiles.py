@@ -69,6 +69,25 @@ def update_profile(
     )
 
 
+def clone_profile(profiles_dir: Path, source_name: str, target_name: str) -> Path:
+    profile = load_profile(profile_path(profiles_dir, source_name))
+    return write_profile(
+        profiles_dir,
+        Profile(
+            name=target_name,
+            agent=profile.agent,
+            skills=profile.skills,
+            exclude=profile.exclude,
+        ),
+    )
+
+
+def rename_profile(profiles_dir: Path, source_name: str, target_name: str) -> Path:
+    clone_path = clone_profile(profiles_dir, source_name, target_name)
+    remove_profile(profiles_dir, source_name)
+    return clone_path
+
+
 def _parse_simple_profile_yaml(content: str) -> dict[str, str | list[str]]:
     data: dict[str, str | list[str]] = {}
     active_list: str | None = None

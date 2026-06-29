@@ -501,6 +501,88 @@ class CliTests(unittest.TestCase):
             )
             self.assertIn("updated:", output.getvalue())
 
+    def test_profile_clone_command_creates_new_profile_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            profiles = root / "profiles"
+            profiles.mkdir(parents=True)
+            (profiles / "default.yaml").write_text(
+                "name: default\n"
+                "agent: codex\n"
+                "skills:\n"
+                "  - k8s-finder\n"
+                "exclude:\n"
+                "  - experimental-*\n",
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "profile",
+                        "clone",
+                        "--root",
+                        str(root),
+                        "--name",
+                        "default",
+                        "--to",
+                        "staging",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                (profiles / "staging.yaml").read_text(encoding="utf-8"),
+                "name: staging\n"
+                "agent: codex\n"
+                "skills:\n"
+                "  - k8s-finder\n"
+                "exclude:\n"
+                "  - experimental-*\n",
+            )
+            self.assertTrue((profiles / "default.yaml").exists())
+            self.assertIn("cloned:", output.getvalue())
+
+    def test_profile_rename_command_moves_profile_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            profiles = root / "profiles"
+            profiles.mkdir(parents=True)
+            (profiles / "default.yaml").write_text(
+                "name: default\n"
+                "agent: codex\n"
+                "skills:\n"
+                "  - k8s-finder\n",
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "profile",
+                        "rename",
+                        "--root",
+                        str(root),
+                        "--name",
+                        "default",
+                        "--to",
+                        "staging",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertFalse((profiles / "default.yaml").exists())
+            self.assertEqual(
+                (profiles / "staging.yaml").read_text(encoding="utf-8"),
+                "name: staging\n"
+                "agent: codex\n"
+                "skills:\n"
+                "  - k8s-finder\n",
+            )
+            self.assertIn("renamed:", output.getvalue())
+
     def test_doctor_command_reports_missing_expected_links_from_state(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "workspace"

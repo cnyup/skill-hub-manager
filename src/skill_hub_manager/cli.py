@@ -7,9 +7,11 @@ from skill_hub_manager.doctor import find_broken_links, find_missing_expected_li
 from skill_hub_manager.paths import initialize_workspace, resolve_workspace_root, workspace_paths
 from skill_hub_manager.profiles import (
     Profile,
+    clone_profile,
     list_profiles,
     load_profile,
     remove_profile,
+    rename_profile,
     update_profile,
     write_profile,
 )
@@ -87,6 +89,16 @@ def build_parser() -> argparse.ArgumentParser:
     profile_update.add_argument("--remove-skill", action="append", default=[])
     profile_update.add_argument("--add-exclude", action="append", default=[])
     profile_update.add_argument("--remove-exclude", action="append", default=[])
+
+    profile_clone = profile_subparsers.add_parser("clone")
+    profile_clone.add_argument("--root", required=True)
+    profile_clone.add_argument("--name", required=True)
+    profile_clone.add_argument("--to", required=True)
+
+    profile_rename = profile_subparsers.add_parser("rename")
+    profile_rename.add_argument("--root", required=True)
+    profile_rename.add_argument("--name", required=True)
+    profile_rename.add_argument("--to", required=True)
 
     return parser
 
@@ -217,6 +229,16 @@ def main(argv: list[str] | None = None) -> int:
         )
         write_profile(paths.profiles, updated)
         print(f"updated: {path}")
+        return 0
+    if args.command == "profile" and args.profile_command == "clone":
+        paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
+        path = clone_profile(paths.profiles, args.name, args.to)
+        print(f"cloned: {path}")
+        return 0
+    if args.command == "profile" and args.profile_command == "rename":
+        paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
+        path = rename_profile(paths.profiles, args.name, args.to)
+        print(f"renamed: {path}")
         return 0
     parser.print_help()
     return 0

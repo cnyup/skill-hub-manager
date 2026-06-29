@@ -3,9 +3,12 @@ import unittest
 from pathlib import Path
 
 from skill_hub_manager.profiles import (
+    Profile,
+    clone_profile,
     list_profiles,
     load_profile,
     remove_profile,
+    rename_profile,
     update_profile,
     write_profile,
 )
@@ -145,6 +148,56 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(updated.agent, "claude")
         self.assertEqual(updated.skills, ["k8s-finder", "release-checker"])
         self.assertEqual(updated.exclude, ["legacy-*"])
+
+    def test_clone_profile_copies_content_with_new_name(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            profiles_dir = Path(temp_dir)
+            write_profile(
+                profiles_dir,
+                Profile(
+                    name="default",
+                    agent="codex",
+                    skills=["k8s-finder"],
+                    exclude=["experimental-*"],
+                ),
+            )
+
+            path = clone_profile(profiles_dir, "default", "staging")
+
+            self.assertEqual(path, profiles_dir / "staging.yaml")
+            self.assertEqual(
+                path.read_text(encoding="utf-8"),
+                "name: staging\n"
+                "agent: codex\n"
+                "skills:\n"
+                "  - k8s-finder\n"
+                "exclude:\n"
+                "  - experimental-*\n",
+            )
+
+    def test_rename_profile_moves_file_and_updates_name(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            profiles_dir = Path(temp_dir)
+            write_profile(
+                profiles_dir,
+                Profile(
+                    name="default",
+                    agent="codex",
+                    skills=["k8s-finder"],
+                ),
+            )
+
+            path = rename_profile(profiles_dir, "default", "staging")
+
+            self.assertEqual(path, profiles_dir / "staging.yaml")
+            self.assertFalse((profiles_dir / "default.yaml").exists())
+            self.assertEqual(
+                path.read_text(encoding="utf-8"),
+                "name: staging\n"
+                "agent: codex\n"
+                "skills:\n"
+                "  - k8s-finder\n",
+            )
 
 
 def _write_fixture(path: Path, content: str) -> Path:

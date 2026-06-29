@@ -70,6 +70,18 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli profile update --root /Users/yup
   --remove-exclude experimental-*
 ```
 
+To copy or rename a profile:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile clone --root /Users/yup/.skill-hub \
+  --name default \
+  --to staging
+
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile rename --root /Users/yup/.skill-hub \
+  --name staging \
+  --to release
+```
+
 ## 4. Build the registry
 
 ```bash

@@ -39,6 +39,8 @@ The MVP provides:
 - `skill-hub profile show --root <path> --name <profile>`
 - `skill-hub profile add --root <path> --name <profile> --agent <agent> --skill <skill>`
 - `skill-hub profile update --root <path> --name <profile>`
+- `skill-hub profile clone --root <path> --name <profile> --to <profile>`
+- `skill-hub profile rename --root <path> --name <profile> --to <profile>`
 - `skill-hub profile remove --root <path> --name <profile>`
 - `skill-hub sync --root <path> --target <path> [--dry-run]`
 - `skill-hub doctor --root <path>`
@@ -106,6 +108,18 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli profile update --root /Users/yup
   --remove-skill billing-labeler \
   --add-exclude legacy-* \
   --remove-exclude experimental-*
+```
+
+Clone or rename an existing profile:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile clone --root /Users/yup/.skill-hub \
+  --name default \
+  --to staging
+
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile rename --root /Users/yup/.skill-hub \
+  --name staging \
+  --to release
 ```
 
 Check for broken symlinks in the last synced target:

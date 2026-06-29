@@ -91,6 +91,12 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli profile validate --root /Users/y
 PYTHONPATH=src python3 -m skill_hub_manager.cli profile validate --root /Users/yup/.skill-hub
 ```
 
+For machine-readable profile validation:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile validate --root /Users/yup/.skill-hub --json
+```
+
 ## 4. Build the registry
 
 ```bash
@@ -110,6 +116,12 @@ You can also check whether `state/registry.yaml` has drifted from the current va
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli registry doctor --root /Users/yup/.skill-hub
+```
+
+For machine-readable registry diagnostics:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli registry doctor --root /Users/yup/.skill-hub --json
 ```
 
 You can also audit profiles against the current vault:

@@ -7,6 +7,7 @@ from skill_hub_manager.profiles import (
     clone_profile,
     list_profiles,
     load_profile,
+    render_profile_validation_json,
     remove_profile,
     rename_profile,
     update_profile,
@@ -251,6 +252,34 @@ class ProfileTests(unittest.TestCase):
         issues = validate_profile(Profile(name="default", agent="codex", skills=[]), set())
 
         self.assertEqual(issues, ["empty-skills"])
+
+    def test_render_profile_validation_json_returns_stable_payload(self):
+        rendered = render_profile_validation_json(
+            [
+                {"profile": "default", "valid": False, "issues": ["duplicate-skill: k8s-finder"]},
+                {"profile": "staging", "valid": True, "issues": []},
+            ]
+        )
+
+        self.assertEqual(
+            rendered,
+            '{\n'
+            '  "profiles": [\n'
+            '    {\n'
+            '      "profile": "default",\n'
+            '      "valid": false,\n'
+            '      "issues": [\n'
+            '        "duplicate-skill: k8s-finder"\n'
+            '      ]\n'
+            '    },\n'
+            '    {\n'
+            '      "profile": "staging",\n'
+            '      "valid": true,\n'
+            '      "issues": []\n'
+            '    }\n'
+            '  ]\n'
+            '}',
+        )
 
 
 def _write_fixture(path: Path, content: str) -> Path:

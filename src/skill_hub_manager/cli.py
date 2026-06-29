@@ -10,13 +10,20 @@ from skill_hub_manager.profiles import (
     clone_profile,
     list_profiles,
     load_profile,
+    render_profile_validation_json,
     remove_profile,
     rename_profile,
     update_profile,
     validate_profile,
     write_profile,
 )
-from skill_hub_manager.registry import doctor_registry, find_registry_entries, load_registry_entries, write_registry
+from skill_hub_manager.registry import (
+    doctor_registry,
+    find_registry_entries,
+    load_registry_entries,
+    render_registry_doctor_json,
+    write_registry,
+)
 from skill_hub_manager.skills import scan_skills
 from skill_hub_manager.sync import render_sync_result_json, sync_profile, write_sync_state
 
@@ -54,6 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
     registry_doctor.add_argument("--vault")
     registry_doctor.add_argument("--output")
     registry_doctor.add_argument("--root")
+    registry_doctor.add_argument("--json", action="store_true")
 
     sync = subparsers.add_parser("sync")
     sync.add_argument("--vault")
@@ -110,6 +118,7 @@ def build_parser() -> argparse.ArgumentParser:
     profile_validate = profile_subparsers.add_parser("validate")
     profile_validate.add_argument("--root", required=True)
     profile_validate.add_argument("--name")
+    profile_validate.add_argument("--json", action="store_true")
 
     return parser
 
@@ -155,6 +164,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "registry" and args.registry_command == "doctor":
         vault, output_path = _resolve_registry_paths(args)
         issues = doctor_registry(vault, output_path)
+        if args.json:
+            print(render_registry_doctor_json(issues))
+            return 1 if issues else 0
         if not issues:
             print("ok: registry")
             return 0
@@ -293,16 +305,30 @@ def main(argv: list[str] | None = None) -> int:
             else list_profiles(paths.profiles)
         )
         has_issues = False
+        results: list[dict[str, str | bool | list[str]]] = []
         for profile_path in profile_paths:
             profile = load_profile(profile_path)
             issues = validate_profile(profile, available_skills)
+            results.append(
+                {
+                    "profile": profile.name,
+                    "valid": not issues,
+                    "issues": issues,
+                }
+            )
             if issues:
                 has_issues = True
+                if args.json:
+                    continue
                 print(f"profile: {profile.name}")
                 for issue in issues:
                     print(issue)
                 continue
+            if args.json:
+                continue
             print(f"ok: {profile.name}")
+        if args.json:
+            print(render_profile_validation_json(results))
         return 1 if has_issues else 0
     parser.print_help()
     return 0

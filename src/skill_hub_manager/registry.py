@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from skill_hub_manager.skills import scan_skills
@@ -96,3 +97,7 @@ def doctor_registry(vault: Path, registry_file: Path) -> list[str]:
             issues.append(f"unregistered-skill: {name}")
 
     return issues
+
+
+def render_registry_doctor_json(issues: list[str]) -> str:
+    return json.dumps({"ok": not issues, "issues": issues}, indent=2)

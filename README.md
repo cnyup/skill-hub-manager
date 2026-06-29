@@ -71,6 +71,12 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli registry doctor --root /Users/yu
 - `stale-registry-skill`
 - `unregistered-skill`
 
+It also supports machine-readable output:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli registry doctor --root /Users/yup/.skill-hub --json
+```
+
 The generated registry currently uses stable skill-name ordering and includes `path`, `visibility`, and any non-empty `description`, `agents`, and `tags` fields from `SKILL.md` frontmatter.
 
 Scan the workspace vault:
@@ -141,6 +147,12 @@ Validate one profile or all profiles in the workspace:
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli profile validate --root /Users/yup/.skill-hub --name default
 PYTHONPATH=src python3 -m skill_hub_manager.cli profile validate --root /Users/yup/.skill-hub
+```
+
+For automation, use JSON output:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile validate --root /Users/yup/.skill-hub --json
 ```
 
 `profile add`, `profile clone`, and `profile rename` now refuse to overwrite an existing target profile file.

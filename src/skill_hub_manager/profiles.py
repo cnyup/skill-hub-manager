@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
+import json
 from pathlib import Path
 
 
@@ -100,6 +101,10 @@ def validate_profile(profile: Profile, available_skills: set[str] | None = None)
             if skill not in available_skills:
                 issues.append(f"missing-skill: {skill}")
     return _unique_preserving_order(issues)
+
+
+def render_profile_validation_json(results: list[dict[str, str | bool | list[str]]]) -> str:
+    return json.dumps({"profiles": results}, indent=2)
 
 
 def _parse_simple_profile_yaml(content: str) -> dict[str, str | list[str]]:

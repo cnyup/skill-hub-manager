@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from skill_hub_manager.registry import build_registry, doctor_registry, write_registry
+from skill_hub_manager.registry import build_registry, doctor_registry, render_registry_doctor_json, write_registry
 
 
 class RegistryTests(unittest.TestCase):
@@ -123,3 +123,22 @@ class RegistryTests(unittest.TestCase):
             issues = doctor_registry(vault, registry)
 
         self.assertEqual(issues, [])
+
+    def test_render_registry_doctor_json_returns_stable_payload(self):
+        rendered = render_registry_doctor_json(
+            [
+                "path-mismatch: k8s-finder registry=/tmp/old vault=/tmp/new",
+                "stale-registry-skill: stale-skill",
+            ]
+        )
+
+        self.assertEqual(
+            rendered,
+            '{\n'
+            '  "ok": false,\n'
+            '  "issues": [\n'
+            '    "path-mismatch: k8s-finder registry=/tmp/old vault=/tmp/new",\n'
+            '    "stale-registry-skill: stale-skill"\n'
+            '  ]\n'
+            '}',
+        )

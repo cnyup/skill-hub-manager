@@ -420,6 +420,33 @@ class CliTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertIn("ok: registry", output.getvalue())
 
+    def test_registry_doctor_command_json_outputs_machine_readable_result(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            skills = root / "skills"
+            state = root / "state"
+            skills.mkdir(parents=True)
+            state.mkdir(parents=True)
+            current = skills / "k8s-finder"
+            current.mkdir()
+            (current / "SKILL.md").write_text("---\nname: k8s-finder\nvisibility: team\n---\n", encoding="utf-8")
+            (state / "registry.yaml").write_text(
+                "skills:\n"
+                "  k8s-finder:\n"
+                "    path: /tmp/old-k8s-finder\n"
+                "    visibility: team\n",
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["registry", "doctor", "--root", str(root), "--json"])
+
+            payload = json.loads(output.getvalue())
+            self.assertEqual(exit_code, 1)
+            self.assertFalse(payload["ok"])
+            self.assertIn("path-mismatch: k8s-finder", payload["issues"][0])
+
     def test_ls_command_prints_registry_names(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "workspace"
@@ -845,6 +872,34 @@ class CliTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertIn("ok: default", output.getvalue())
+
+    def test_profile_validate_command_json_outputs_machine_readable_result(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            profiles = root / "profiles"
+            skills = root / "skills"
+            profiles.mkdir(parents=True)
+            skills.mkdir(parents=True)
+            (skills / "k8s-finder").mkdir()
+            (skills / "k8s-finder" / "SKILL.md").write_text("# skill", encoding="utf-8")
+            (profiles / "default.yaml").write_text(
+                "name: default\n"
+                "agent: codex\n"
+                "skills:\n"
+                "  - k8s-finder\n"
+                "  - missing-skill\n",
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["profile", "validate", "--root", str(root), "--json"])
+
+            payload = json.loads(output.getvalue())
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(payload["profiles"][0]["profile"], "default")
+            self.assertFalse(payload["profiles"][0]["valid"])
+            self.assertIn("missing-skill: missing-skill", payload["profiles"][0]["issues"])
 
     def test_doctor_command_reports_missing_expected_links_from_state(self):
         with tempfile.TemporaryDirectory() as temp_dir:

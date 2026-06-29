@@ -82,6 +82,15 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli profile rename --root /Users/yup
   --to release
 ```
 
+These write commands refuse to overwrite an existing target profile file.
+
+To validate one profile or all profiles:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile validate --root /Users/yup/.skill-hub --name default
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile validate --root /Users/yup/.skill-hub
+```
+
 ## 4. Build the registry
 
 ```bash

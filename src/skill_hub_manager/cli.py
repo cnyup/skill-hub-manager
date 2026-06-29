@@ -13,6 +13,7 @@ from skill_hub_manager.profiles import (
     remove_profile,
     rename_profile,
     update_profile,
+    validate_profile,
     write_profile,
 )
 from skill_hub_manager.registry import find_registry_entries, load_registry_entries, write_registry
@@ -99,6 +100,10 @@ def build_parser() -> argparse.ArgumentParser:
     profile_rename.add_argument("--root", required=True)
     profile_rename.add_argument("--name", required=True)
     profile_rename.add_argument("--to", required=True)
+
+    profile_validate = profile_subparsers.add_parser("validate")
+    profile_validate.add_argument("--root", required=True)
+    profile_validate.add_argument("--name")
 
     return parser
 
@@ -196,15 +201,19 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "profile" and args.profile_command == "add":
         paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
-        path = write_profile(
-            paths.profiles,
-            Profile(
-                name=args.name,
-                agent=args.agent,
-                skills=args.skill,
-                exclude=args.exclude,
-            ),
-        )
+        try:
+            path = write_profile(
+                paths.profiles,
+                Profile(
+                    name=args.name,
+                    agent=args.agent,
+                    skills=args.skill,
+                    exclude=args.exclude,
+                ),
+            )
+        except FileExistsError as error:
+            print(f"exists: {error.args[0]}")
+            return 1
         print(f"wrote: {path}")
         return 0
     if args.command == "profile" and args.profile_command == "remove":
@@ -227,19 +236,47 @@ def main(argv: list[str] | None = None) -> int:
             add_exclude=args.add_exclude,
             remove_exclude=args.remove_exclude,
         )
-        write_profile(paths.profiles, updated)
+        write_profile(paths.profiles, updated, overwrite=True)
         print(f"updated: {path}")
         return 0
     if args.command == "profile" and args.profile_command == "clone":
         paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
-        path = clone_profile(paths.profiles, args.name, args.to)
+        try:
+            path = clone_profile(paths.profiles, args.name, args.to)
+        except FileExistsError as error:
+            print(f"exists: {error.args[0]}")
+            return 1
         print(f"cloned: {path}")
         return 0
     if args.command == "profile" and args.profile_command == "rename":
         paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
-        path = rename_profile(paths.profiles, args.name, args.to)
+        try:
+            path = rename_profile(paths.profiles, args.name, args.to)
+        except FileExistsError as error:
+            print(f"exists: {error.args[0]}")
+            return 1
         print(f"renamed: {path}")
         return 0
+    if args.command == "profile" and args.profile_command == "validate":
+        paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
+        available_skills = set(scan_skills(paths.skills))
+        profile_paths = (
+            [paths.profiles / f"{args.name}.yaml"]
+            if args.name
+            else list_profiles(paths.profiles)
+        )
+        has_issues = False
+        for profile_path in profile_paths:
+            profile = load_profile(profile_path)
+            issues = validate_profile(profile, available_skills)
+            if issues:
+                has_issues = True
+                print(f"profile: {profile.name}")
+                for issue in issues:
+                    print(issue)
+                continue
+            print(f"ok: {profile.name}")
+        return 1 if has_issues else 0
     parser.print_help()
     return 0
 

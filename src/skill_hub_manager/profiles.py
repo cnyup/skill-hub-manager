@@ -34,9 +34,11 @@ def list_profiles(profiles_dir: Path) -> list[Path]:
     return sorted(path for path in profiles_dir.iterdir() if path.is_file() and path.suffix == ".yaml")
 
 
-def write_profile(profiles_dir: Path, profile: Profile) -> Path:
+def write_profile(profiles_dir: Path, profile: Profile, overwrite: bool = False) -> Path:
     profiles_dir.mkdir(parents=True, exist_ok=True)
     path = profile_path(profiles_dir, profile.name)
+    if path.exists() and not overwrite:
+        raise FileExistsError(path)
     path.write_text(_render_profile(profile), encoding="utf-8")
     return path
 
@@ -86,6 +88,18 @@ def rename_profile(profiles_dir: Path, source_name: str, target_name: str) -> Pa
     clone_path = clone_profile(profiles_dir, source_name, target_name)
     remove_profile(profiles_dir, source_name)
     return clone_path
+
+
+def validate_profile(profile: Profile, available_skills: set[str] | None = None) -> list[str]:
+    issues: list[str] = []
+    if not profile.skills:
+        issues.append("empty-skills")
+    issues.extend(_duplicate_issues(profile.skills, "duplicate-skill"))
+    if available_skills is not None:
+        for skill in profile.skills:
+            if skill not in available_skills:
+                issues.append(f"missing-skill: {skill}")
+    return _unique_preserving_order(issues)
 
 
 def _parse_simple_profile_yaml(content: str) -> dict[str, str | list[str]]:
@@ -145,4 +159,28 @@ def _merge_list(existing: list[str], additions: list[str], removals: list[str]) 
             continue
         result.append(item)
         seen.add(item)
+    return result
+
+
+def _duplicate_issues(values: list[str], prefix: str) -> list[str]:
+    issues: list[str] = []
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for value in values:
+        if value in seen and value not in duplicates:
+            issues.append(f"{prefix}: {value}")
+            duplicates.add(value)
+            continue
+        seen.add(value)
+    return issues
+
+
+def _unique_preserving_order(values: list[str]) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if value in seen:
+            continue
+        result.append(value)
+        seen.add(value)
     return result

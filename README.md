@@ -41,6 +41,7 @@ The MVP provides:
 - `skill-hub profile update --root <path> --name <profile>`
 - `skill-hub profile clone --root <path> --name <profile> --to <profile>`
 - `skill-hub profile rename --root <path> --name <profile> --to <profile>`
+- `skill-hub profile validate --root <path> [--name <profile>]`
 - `skill-hub profile remove --root <path> --name <profile>`
 - `skill-hub sync --root <path> --target <path> [--dry-run]`
 - `skill-hub doctor --root <path>`
@@ -121,6 +122,15 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli profile rename --root /Users/yup
   --name staging \
   --to release
 ```
+
+Validate one profile or all profiles in the workspace:
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile validate --root /Users/yup/.skill-hub --name default
+PYTHONPATH=src python3 -m skill_hub_manager.cli profile validate --root /Users/yup/.skill-hub
+```
+
+`profile add`, `profile clone`, and `profile rename` now refuse to overwrite an existing target profile file.
 
 Check for broken symlinks in the last synced target:
 

@@ -10,6 +10,7 @@ from skill_hub_manager.profiles import (
     remove_profile,
     rename_profile,
     update_profile,
+    validate_profile,
     write_profile,
 )
 
@@ -110,6 +111,17 @@ class ProfileTests(unittest.TestCase):
                 "  - experimental-*\n",
             )
 
+    def test_write_profile_refuses_to_overwrite_existing_profile(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            profiles_dir = Path(temp_dir)
+            (profiles_dir / "default.yaml").write_text("name: default\nagent: codex\nskills:\n", encoding="utf-8")
+
+            with self.assertRaises(FileExistsError):
+                write_profile(
+                    profiles_dir,
+                    Profile(name="default", agent="codex", skills=["k8s-finder"]),
+                )
+
     def test_remove_profile_deletes_existing_profile_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             profiles_dir = Path(temp_dir)
@@ -175,6 +187,18 @@ class ProfileTests(unittest.TestCase):
                 "  - experimental-*\n",
             )
 
+    def test_clone_profile_refuses_to_overwrite_existing_target(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            profiles_dir = Path(temp_dir)
+            write_profile(
+                profiles_dir,
+                Profile(name="default", agent="codex", skills=["k8s-finder"]),
+            )
+            (profiles_dir / "staging.yaml").write_text("name: staging\nagent: codex\nskills:\n", encoding="utf-8")
+
+            with self.assertRaises(FileExistsError):
+                clone_profile(profiles_dir, "default", "staging")
+
     def test_rename_profile_moves_file_and_updates_name(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             profiles_dir = Path(temp_dir)
@@ -198,6 +222,35 @@ class ProfileTests(unittest.TestCase):
                 "skills:\n"
                 "  - k8s-finder\n",
             )
+
+    def test_rename_profile_refuses_to_overwrite_existing_target(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            profiles_dir = Path(temp_dir)
+            write_profile(
+                profiles_dir,
+                Profile(name="default", agent="codex", skills=["k8s-finder"]),
+            )
+            (profiles_dir / "staging.yaml").write_text("name: staging\nagent: codex\nskills:\n", encoding="utf-8")
+
+            with self.assertRaises(FileExistsError):
+                rename_profile(profiles_dir, "default", "staging")
+
+    def test_validate_profile_reports_empty_duplicate_and_missing_skill_issues(self):
+        issues = validate_profile(
+            Profile(
+                name="default",
+                agent="codex",
+                skills=["k8s-finder", "k8s-finder", "missing-skill"],
+            ),
+            {"k8s-finder"},
+        )
+
+        self.assertEqual(issues, ["duplicate-skill: k8s-finder", "missing-skill: missing-skill"])
+
+    def test_validate_profile_reports_empty_skill_list(self):
+        issues = validate_profile(Profile(name="default", agent="codex", skills=[]), set())
+
+        self.assertEqual(issues, ["empty-skills"])
 
 
 def _write_fixture(path: Path, content: str) -> Path:

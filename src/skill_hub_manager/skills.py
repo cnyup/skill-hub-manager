@@ -54,8 +54,20 @@ def _parse_frontmatter(content: str) -> dict[str, str | list[str]]:
 def _parse_simple_yaml(content: str) -> dict[str, str | list[str]]:
     data: dict[str, str | list[str]] = {}
     active_list: str | None = None
+    active_block: str | None = None
+    block_lines: list[str] = []
     for raw_line in content.splitlines():
         line = raw_line.rstrip()
+        if active_block is not None:
+            if not line:
+                block_lines.append("")
+                continue
+            if line.startswith("  "):
+                block_lines.append(line[2:])
+                continue
+            data[active_block] = "\n".join(block_lines).rstrip()
+            active_block = None
+            block_lines = []
         if not line.strip() or line.lstrip().startswith("#"):
             continue
         if line.startswith("  - "):
@@ -73,9 +85,15 @@ def _parse_simple_yaml(content: str) -> dict[str, str | list[str]]:
         key, value = line.split(":", 1)
         key = key.strip()
         value = value.strip()
+        if value == "|":
+            active_block = key
+            block_lines = []
+            continue
         if value:
             data[key] = value
         else:
             data[key] = []
             active_list = key
+    if active_block is not None:
+        data[active_block] = "\n".join(block_lines).rstrip()
     return data

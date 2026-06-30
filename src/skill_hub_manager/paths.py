@@ -23,6 +23,10 @@ def workspace_paths(root: Path) -> WorkspacePaths:
     )
 
 
+def install_state_file(root: Path) -> Path:
+    return workspace_paths(root).state / "install-targets.json"
+
+
 def initialize_workspace(root: Path) -> WorkspacePaths:
     paths = workspace_paths(root)
     paths.skills.mkdir(parents=True, exist_ok=True)

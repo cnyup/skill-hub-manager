@@ -44,6 +44,52 @@ def _get_manager_revision(checkout_dir: Path) -> str:
     return result.stdout.strip()
 
 
+def _profile_exists(workspace_root: Path, profile: str) -> bool:
+    return (workspace_root / "profiles" / f"{profile}.yaml").is_file()
+
+
+def _ensure_profile(
+    cli: Path,
+    workspace_root: Path,
+    profile: str,
+    agent: str,
+    skills: list[str],
+    update_profile_skills: bool,
+) -> None:
+    if not _profile_exists(workspace_root=workspace_root, profile=profile):
+        profile_command = [
+            str(cli),
+            "profile",
+            "add",
+            "--root",
+            str(workspace_root),
+            "--name",
+            profile,
+            "--agent",
+            agent,
+        ]
+        for skill in skills:
+            profile_command.extend(["--skill", skill])
+        subprocess.run(profile_command, check=True)
+        return
+
+    if not update_profile_skills:
+        return
+
+    profile_command = [
+        str(cli),
+        "profile",
+        "update",
+        "--root",
+        str(workspace_root),
+        "--name",
+        profile,
+    ]
+    for skill in skills:
+        profile_command.extend(["--add-skill", skill])
+    subprocess.run(profile_command, check=True)
+
+
 def run_install_flow(
     repo_url: str,
     checkout_dir: Path,
@@ -54,6 +100,7 @@ def run_install_flow(
     skills: list[str],
     update_manager: bool,
     mode: str = "apply",
+    update_profile_skills: bool = False,
 ) -> None:
     checkout = ensure_manager_checkout(repo_url=repo_url, checkout_dir=checkout_dir, update=update_manager)
     cli = checkout / "bin" / "skill-hub"
@@ -72,21 +119,14 @@ def run_install_flow(
 
     subprocess.run([str(cli), "init", "--root", str(workspace_root)], check=True)
     subprocess.run([str(cli), "registry", "build", "--root", str(workspace_root)], check=True)
-
-    profile_add = [
-        str(cli),
-        "profile",
-        "add",
-        "--root",
-        str(workspace_root),
-        "--name",
-        profile,
-        "--agent",
-        agent,
-    ]
-    for skill in skills:
-        profile_add.extend(["--skill", skill])
-    subprocess.run(profile_add, check=True)
+    _ensure_profile(
+        cli=cli,
+        workspace_root=workspace_root,
+        profile=profile,
+        agent=agent,
+        skills=skills,
+        update_profile_skills=update_profile_skills,
+    )
     subprocess.run([str(cli), "profile", "validate", "--root", str(workspace_root), "--name", profile], check=True)
     subprocess.run(
         [

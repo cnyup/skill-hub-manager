@@ -211,18 +211,26 @@ The installer must also define how `skill-hub-manager` itself is obtained.
 First-version behavior:
 
 1. if the current repository already contains `./bin/skill-hub`, reuse it
-2. else if a previously configured manager path exists in local install state, reuse it
-3. else require the user to provide a local checkout path manually
+2. else if a previously configured manager path exists in local install state, reuse it and offer to update it
+3. else clone the manager repository into a user-confirmed local path
+4. after clone or reuse, verify that `bin/skill-hub` exists and is executable
+5. if the repository already exists locally, offer to pull/update it before continuing
 
-The first version does not attempt to clone or update the manager repository automatically.
+Suggested default clone path:
+
+- `~/skill-hub-manager`
+
+Suggested repository source:
+
+- the public GitHub repository configured for `skill-hub-manager`
 
 Rationale:
 
 - repository acquisition has network and trust implications
-- local checkout reuse is enough for the first guided installer workflow
-- this keeps the installer skill focused on setup and sync, not source acquisition
+- users still expect an installer skill to be able to obtain or refresh the manager
+- clone/update should remain visible and confirmed, not hidden
 
-Future versions may add optional repository bootstrap or update flows.
+All clone/update actions must remain behind the same confirmation gate used for target selection.
 
 ### Phase 5: Summarize
 
@@ -264,6 +272,8 @@ Suggested fields:
 - `profile`
 - `target_dir`
 - `manager_path`
+- `manager_repo`
+- `manager_revision`
 - `installed_at`
 - `detection_confidence`
 - `detection_reason`
@@ -310,9 +320,17 @@ If the user chooses to create an empty profile:
 
 If no local manager checkout or executable path can be found:
 
-- stop before any setup write
-- ask the user to provide a local manager path
-- once provided, verify that `bin/skill-hub` exists there before continuing
+- ask the user to confirm cloning the repository into a local path
+- if clone is declined, stop before setup writes
+- after clone, verify that `bin/skill-hub` exists there before continuing
+
+### Manager update failures
+
+If the repository exists locally but update fails:
+
+- show the git failure
+- ask whether to continue with the current local revision
+- if the user declines, stop before sync
 
 ### Registry drift
 
@@ -345,11 +363,13 @@ The first implementation should test:
 3. fallback when detection fails
 4. confirmation-required flow
 5. initial skill set selection
-6. manager path reuse and manual manager path fallback
-7. profile creation or update
-8. sync to chosen target
-9. post-sync doctor and validation behavior
-10. install record persistence
+6. manager clone flow
+7. manager update flow
+8. manager path reuse fallback
+9. profile creation or update
+10. sync to chosen target
+11. post-sync doctor and validation behavior
+12. install record persistence
 
 Prefer testing the helper scripts and orchestration boundaries separately, rather than one large end-to-end shell-only test.
 
@@ -357,12 +377,13 @@ Prefer testing the helper scripts and orchestration boundaries separately, rathe
 
 1. Add agent mapping and detection helper
 2. Add install record format and persistence helper
-3. Add manager path resolution helper
-4. Add initial skill set selection flow
-5. Add installer orchestration script
-6. Create installer skill wrapper around the script
-7. Add docs and examples
-8. Add tests
+3. Add manager clone/update helper
+4. Add manager path resolution helper
+5. Add initial skill set selection flow
+6. Add installer orchestration script
+7. Create installer skill wrapper around the script
+8. Add docs and examples
+9. Add tests
 
 ## Recommendation
 

@@ -93,6 +93,20 @@ The full installation notes are in [installation.md](docs/installation.md).
 
 The public installer skill bootstraps `skill-hub-manager`; it does **not** contain private skills, private vault content, or other sensitive assets.
 
+To use the installer skill on a new machine:
+
+1. Clone this repository to a local path such as `~/skill-hub-manager`.
+2. Copy `skills/install-skill-hub/` into a skill directory your agent already reads.
+3. Start the agent and ask it to use `install-skill-hub` to install `skill-hub-manager`.
+4. Confirm the detected checkout path, workspace root, profile, and target directory before it continues.
+5. After installation, verify the result with `skill-hub install-state show --root <workspace> --agent <agent> --json`.
+
+Example request to the agent:
+
+```text
+Use the install-skill-hub skill. Install skill-hub-manager for Codex, detect the target skills directory, ask me to confirm every clone, update, and sync path, then sync the selected profile.
+```
+
 It detects the current setup in this order:
 
 1. existing checkout wrapper: `./bin/skill-hub`

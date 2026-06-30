@@ -8,6 +8,40 @@ This project currently supports two practical ways to run `skill-hub`.
 
 The public installer skill bootstraps the manager only. It does not contain private skills, private vault content, or other sensitive assets.
 
+### How To Use The Installer Skill
+
+1. Clone this repository on the new machine:
+
+```bash
+git clone https://github.com/cnyup/skill-hub-manager.git ~/skill-hub-manager
+cd ~/skill-hub-manager
+```
+
+2. Copy the installer skill into a skill directory your agent already reads:
+
+```bash
+mkdir -p ~/.codex/skills
+cp -R ~/skill-hub-manager/skills/install-skill-hub ~/.codex/skills/
+```
+
+3. In the agent, send a request like:
+
+```text
+Use the install-skill-hub skill. Install skill-hub-manager for Codex, detect the target skills directory, ask me to confirm every clone, update, and sync path, then sync the selected profile.
+```
+
+4. Confirm these values before the agent proceeds:
+- manager checkout path
+- workspace root such as `~/.skill-hub`
+- profile name such as `codex`
+- target skills directory such as `~/.codex/skills`
+
+5. Verify the final result:
+
+```bash
+~/skill-hub-manager/bin/skill-hub install-state show --root ~/.skill-hub --agent codex --json
+```
+
 Detection order:
 
 1. Use the checkout wrapper if `./bin/skill-hub` is available.

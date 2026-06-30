@@ -8,6 +8,40 @@
 
 公共 installer skill 只负责引导安装和使用 `skill-hub-manager`，不会包含任何私有 skills、私有 vault 内容或其他敏感资产。
 
+### 如何实际使用 Installer Skill
+
+1. 在新机器上先 clone 本仓库：
+
+```bash
+git clone https://github.com/cnyup/skill-hub-manager.git ~/skill-hub-manager
+cd ~/skill-hub-manager
+```
+
+2. 把 installer skill 复制到目标 agent 已经会读取的 skills 目录：
+
+```bash
+mkdir -p ~/.codex/skills
+cp -R ~/skill-hub-manager/skills/install-skill-hub ~/.codex/skills/
+```
+
+3. 在 agent 中发送类似这样的请求：
+
+```text
+使用 install-skill-hub 这个 skill。为 Codex 安装 skill-hub-manager，检测目标 skills 目录，并在任何 clone、update、sync 之前先向我确认路径，然后再同步选中的 profile。
+```
+
+4. 在 agent 继续前，确认这些值：
+- manager checkout 路径
+- workspace 根目录，例如 `~/.skill-hub`
+- profile 名称，例如 `codex`
+- 目标 skills 目录，例如 `~/.codex/skills`
+
+5. 安装结束后，执行下面的命令确认结果：
+
+```bash
+~/skill-hub-manager/bin/skill-hub install-state show --root ~/.skill-hub --agent codex --json
+```
+
 检测顺序如下：
 
 1. 如果 `./bin/skill-hub` 可用，就优先使用 checkout wrapper。

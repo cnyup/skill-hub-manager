@@ -93,6 +93,20 @@ skill-hub --version
 
 公共 installer skill 只负责引导安装和使用 `skill-hub-manager`，不会包含任何私有 skills、私有 vault 内容或其他敏感资产。
 
+在新机器上使用 installer skill 的步骤：
+
+1. 先把本仓库 clone 到本地，例如 `~/skill-hub-manager`。
+2. 将 `skills/install-skill-hub/` 复制到目标 agent 已经会读取的 skills 目录。
+3. 启动 agent，并明确要求它使用 `install-skill-hub` 来安装 `skill-hub-manager`。
+4. 在它继续前，确认它识别出的 checkout 路径、workspace 根目录、profile 名称和目标 skills 目录。
+5. 安装结束后，用 `skill-hub install-state show --root <workspace> --agent <agent> --json` 检查结果。
+
+给 agent 的示例指令：
+
+```text
+使用 install-skill-hub 这个 skill。为 Codex 安装 skill-hub-manager，检测目标 skills 目录，并在任何 clone、update、sync 之前先向我确认路径，然后再同步选中的 profile。
+```
+
 它通常按以下顺序检测当前环境：
 
 1. 已存在的 checkout wrapper：`./bin/skill-hub`

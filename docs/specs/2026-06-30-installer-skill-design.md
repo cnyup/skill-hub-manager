@@ -74,9 +74,9 @@ Suggested output shape:
 Detection sources, in order:
 
 1. explicit agent context if available from runtime
-2. known built-in agent mappings
-3. known local directories already present on disk
-4. previous install records
+2. previous install records
+3. known built-in agent mappings
+4. known local directories already present on disk
 5. fallback to unknown
 
 ### 3. Execution helper
@@ -165,11 +165,64 @@ Suggested minimum sequence:
 
 1. ensure manager checkout or install path exists
 2. ensure local vault root exists
-3. ensure profile exists for the detected or selected agent
-4. build registry
-5. validate profile
-6. sync to target
-7. run post-sync diagnostics
+3. resolve the initial skill set for the selected profile
+4. ensure profile exists for the detected or selected agent
+5. build registry
+6. validate profile
+7. sync to target
+8. run post-sync diagnostics
+
+### Phase 4A: Resolve initial skill set
+
+The installer must define where the initial profile contents come from.
+
+First-version behavior:
+
+- if the target profile already exists, do not replace its existing skills list
+- if the target profile does not exist, the installer asks the user to choose the initial skill set
+
+Suggested choices:
+
+1. `all` — include every currently discovered skill in the local vault
+2. `selected` — let the user specify a subset of skill names
+3. `empty` — create the profile with no skills and stop before sync
+
+Recommended default:
+
+- if the vault already contains skills, default to `all`
+- if the vault is empty, default to `empty`
+
+Rationale:
+
+- this makes first install usable without guessing hidden policy
+- it avoids silently creating a profile that references unknown skills
+- it avoids overwriting an existing curated profile
+
+If `empty` is chosen:
+
+- create the profile
+- skip sync
+- instruct the user to add skills and rerun the installer or `sync`
+
+### Phase 4B: Ensure manager availability
+
+The installer must also define how `skill-hub-manager` itself is obtained.
+
+First-version behavior:
+
+1. if the current repository already contains `./bin/skill-hub`, reuse it
+2. else if a previously configured manager path exists in local install state, reuse it
+3. else require the user to provide a local checkout path manually
+
+The first version does not attempt to clone or update the manager repository automatically.
+
+Rationale:
+
+- repository acquisition has network and trust implications
+- local checkout reuse is enough for the first guided installer workflow
+- this keeps the installer skill focused on setup and sync, not source acquisition
+
+Future versions may add optional repository bootstrap or update flows.
 
 ### Phase 5: Summarize
 
@@ -191,6 +244,7 @@ Recommended first-version behavior:
 - if no agent is detected, default profile name: `default`
 - create the profile if missing
 - if the profile exists, update it rather than replacing it blindly
+- never replace an existing profile's skill list without explicit user confirmation
 
 This keeps the initial install path simple and non-destructive.
 
@@ -209,6 +263,7 @@ Suggested fields:
 - `agent`
 - `profile`
 - `target_dir`
+- `manager_path`
 - `installed_at`
 - `detection_confidence`
 - `detection_reason`
@@ -243,6 +298,22 @@ If the selected profile fails validation:
 - show the specific validation issues
 - stop before sync
 
+### Empty profile after install choice
+
+If the user chooses to create an empty profile:
+
+- do not call `sync`
+- explain that no target projection was created yet
+- provide the next command to add skills or update the profile
+
+### Manager not available locally
+
+If no local manager checkout or executable path can be found:
+
+- stop before any setup write
+- ask the user to provide a local manager path
+- once provided, verify that `bin/skill-hub` exists there before continuing
+
 ### Registry drift
 
 If registry drift is detected:
@@ -270,12 +341,15 @@ The repository should add:
 The first implementation should test:
 
 1. known agent detection
-2. fallback when detection fails
-3. confirmation-required flow
-4. profile creation or update
-5. sync to chosen target
-6. post-sync doctor and validation behavior
-7. install record persistence
+2. install-record precedence over built-in mapping
+3. fallback when detection fails
+4. confirmation-required flow
+5. initial skill set selection
+6. manager path reuse and manual manager path fallback
+7. profile creation or update
+8. sync to chosen target
+9. post-sync doctor and validation behavior
+10. install record persistence
 
 Prefer testing the helper scripts and orchestration boundaries separately, rather than one large end-to-end shell-only test.
 
@@ -283,10 +357,12 @@ Prefer testing the helper scripts and orchestration boundaries separately, rathe
 
 1. Add agent mapping and detection helper
 2. Add install record format and persistence helper
-3. Add installer orchestration script
-4. Create installer skill wrapper around the script
-5. Add docs and examples
-6. Add tests
+3. Add manager path resolution helper
+4. Add initial skill set selection flow
+5. Add installer orchestration script
+6. Create installer skill wrapper around the script
+7. Add docs and examples
+8. Add tests
 
 ## Recommendation
 

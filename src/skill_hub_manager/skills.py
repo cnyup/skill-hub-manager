@@ -56,6 +56,7 @@ def _parse_simple_yaml(content: str) -> dict[str, str | list[str]]:
     active_list: str | None = None
     active_block: str | None = None
     block_lines: list[str] = []
+    pending_key: str | None = None
     for raw_line in content.splitlines():
         line = raw_line.rstrip()
         if active_block is not None:
@@ -68,6 +69,24 @@ def _parse_simple_yaml(content: str) -> dict[str, str | list[str]]:
             data[active_block] = "\n".join(block_lines).rstrip()
             active_block = None
             block_lines = []
+        if pending_key is not None:
+            if not line:
+                active_block = pending_key
+                block_lines = [""]
+                pending_key = None
+                continue
+            if line.startswith("  - "):
+                active_list = pending_key
+                data[active_list] = []
+                pending_key = None
+            elif line.startswith("  "):
+                active_block = pending_key
+                block_lines = [line[2:]]
+                pending_key = None
+                continue
+            else:
+                data[pending_key] = []
+                pending_key = None
         if not line.strip() or line.lstrip().startswith("#"):
             continue
         if line.startswith("  - "):
@@ -92,8 +111,10 @@ def _parse_simple_yaml(content: str) -> dict[str, str | list[str]]:
         if value:
             data[key] = value
         else:
-            data[key] = []
-            active_list = key
+            pending_key = key
+            active_list = None
+    if pending_key is not None:
+        data[pending_key] = []
     if active_block is not None:
         data[active_block] = "\n".join(block_lines).rstrip()
     return data

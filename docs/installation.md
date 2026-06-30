@@ -4,6 +4,51 @@
 
 This project currently supports two practical ways to run `skill-hub`.
 
+## Skill-Based Flow
+
+The public installer skill bootstraps the manager only. It does not contain private skills, private vault content, or other sensitive assets.
+
+Detection order:
+
+1. Use the checkout wrapper if `./bin/skill-hub` is available.
+2. Otherwise use an installed `skill-hub` command on `PATH`.
+3. Otherwise ask before cloning the public repository into a local workspace.
+4. Before any update to an existing checkout, ask for explicit confirmation.
+5. Before any sync to a target directory, ask for explicit confirmation.
+
+## Manual CLI Example
+
+Use the wrapper when working from a checkout:
+
+```bash
+./bin/skill-hub init --root ~/.skill-hub
+./bin/skill-hub registry build --root ~/.skill-hub
+./bin/skill-hub sync --root ~/.skill-hub --target ~/.codex/skills --dry-run
+./bin/skill-hub sync --root ~/.skill-hub --target ~/.codex/skills
+```
+
+Use the installed command on a normal workstation:
+
+```bash
+python3 -m pip install -e .
+skill-hub init --root ~/.skill-hub
+skill-hub sync --root ~/.skill-hub --target ~/.codex/skills
+```
+
+## Agent-Driven Install Example
+
+When an agent handles installation, it should follow the same detection order and pause before changing anything external:
+
+```text
+1. Detect an existing checkout wrapper.
+2. Detect an installed `skill-hub` command on PATH.
+3. If neither exists, ask before cloning the public repository.
+4. If an existing checkout needs an update, ask before touching it.
+5. If a sync is needed, ask before writing to the target directory.
+```
+
+The agent installs the public manager, not private skills.
+
 ## Option 1: Wrapper Script From Checkout
 
 This path does not require packaging tools such as `setuptools`.

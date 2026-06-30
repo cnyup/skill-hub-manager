@@ -20,6 +20,47 @@
 - Profiles：按 agent 或项目定义 allowlist
 - Sync 引擎：把允许的 skills 落到各 agent 的目标目录
 
+## 工作示意图
+
+```text
+                  一份真实私有 skill 仓库
+┌────────────────────────────────────────────────────┐
+│ ~/.skill-hub/skills/                              │
+│   demo-skill/                                     │
+│   k8s-finder/                                     │
+│   billing-labeler/                                │
+└────────────────────────────────────────────────────┘
+                         │
+                         │ scan / registry build
+                         ▼
+┌────────────────────────────────────────────────────┐
+│ ~/.skill-hub/state/registry.yaml                  │
+│   已发现的 skill 索引和元数据                     │
+└────────────────────────────────────────────────────┘
+                         │
+                         │ profile 规则决定暴露范围
+                         ▼
+┌────────────────────────────────────────────────────┐
+│ ~/.skill-hub/profiles/                            │
+│   codex.yaml      -> demo-skill, k8s-finder       │
+│   claude.yaml     -> billing-labeler              │
+│   project-a.yaml  -> demo-skill                   │
+└────────────────────────────────────────────────────┘
+             │                    │                    │
+             │ sync               │ sync               │ sync
+             ▼                    ▼                    ▼
+┌─────────────────────┐ ┌─────────────────────┐ ┌─────────────────────┐
+│ ~/.codex/skills/    │ │ ~/.claude/skills/   │ │ ~/project-a/.skills/│
+│ demo-skill -> ...   │ │ billing-labeler->...│ │ demo-skill -> ...   │
+│ k8s-finder -> ...   │ │                     │ │                     │
+└─────────────────────┘ └─────────────────────┘ └─────────────────────┘
+             │                    │                    │
+             ▼                    ▼                    ▼
+            Codex               Claude             项目 Agent
+```
+
+最关键的一点是：真实的 skill 内容始终只保留一份。`sync` 做的只是把“允许给谁使用的那一部分”映射到对应 agent 的目标目录。
+
 ## 内容边界
 
 - GitHub：manager 代码、示例、schema、文档、测试
@@ -47,6 +88,22 @@ skill-hub --version
 当前仓库环境里，默认推荐直接使用 checkout wrapper，因为这条路径已经验证可用。
 
 完整安装说明见 [installation.zh-CN.md](docs/installation.zh-CN.md)。
+
+## Installer Skill
+
+公共 installer skill 只负责引导安装和使用 `skill-hub-manager`，不会包含任何私有 skills、私有 vault 内容或其他敏感资产。
+
+它通常按以下顺序检测当前环境：
+
+1. 已存在的 checkout wrapper：`./bin/skill-hub`
+2. `PATH` 中已安装的命令：`skill-hub`
+3. 如果本地没有 checkout，则先确认再 clone 公开仓库
+4. 在更新现有 checkout 之前，先获得明确确认
+5. 在同步选定 profile 之前，先确认目标目录
+
+在执行任何 `clone`、`update` 或 `sync` 之前，agent 都应先询问确认，并明确展示即将操作的路径或目标目录。
+
+手动 CLI 和 agent-driven install 的示例见 [installation.zh-CN.md](docs/installation.zh-CN.md)。
 
 ## 当前 CLI 能力
 

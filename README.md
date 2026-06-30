@@ -20,6 +20,47 @@ The real skill content lives in a local vault outside the repo, and this project
 - Profiles: per-agent or per-project allowlists
 - Sync engine: materializes allowed skills into agent-specific target directories
 
+## How It Works
+
+```text
+                One private skill vault
+┌────────────────────────────────────────────────────┐
+│ ~/.skill-hub/skills/                              │
+│   demo-skill/                                     │
+│   k8s-finder/                                     │
+│   billing-labeler/                                │
+└────────────────────────────────────────────────────┘
+                         │
+                         │ scan / registry build
+                         ▼
+┌────────────────────────────────────────────────────┐
+│ ~/.skill-hub/state/registry.yaml                  │
+│   Index of discovered skills and metadata         │
+└────────────────────────────────────────────────────┘
+                         │
+                         │ profile rules decide exposure
+                         ▼
+┌────────────────────────────────────────────────────┐
+│ ~/.skill-hub/profiles/                            │
+│   codex.yaml      -> demo-skill, k8s-finder       │
+│   claude.yaml     -> billing-labeler              │
+│   project-a.yaml  -> demo-skill                   │
+└────────────────────────────────────────────────────┘
+             │                    │                    │
+             │ sync               │ sync               │ sync
+             ▼                    ▼                    ▼
+┌─────────────────────┐ ┌─────────────────────┐ ┌─────────────────────┐
+│ ~/.codex/skills/    │ │ ~/.claude/skills/   │ │ ~/project-a/.skills/│
+│ demo-skill -> ...   │ │ billing-labeler->...│ │ demo-skill -> ...   │
+│ k8s-finder -> ...   │ │                     │ │                     │
+└─────────────────────┘ └─────────────────────┘ └─────────────────────┘
+             │                    │                    │
+             ▼                    ▼                    ▼
+           Codex                Claude             Project agent
+```
+
+The important detail is that the real skill content stays in one place. `sync` only projects the allowed subset into each agent's target directory.
+
 ## What lives where
 
 - GitHub: manager code, examples, schemas, docs, tests
@@ -47,6 +88,22 @@ skill-hub --version
 The checkout wrapper path is the default recommendation because it has been verified in this repository's current development environment.
 
 The full installation notes are in [installation.md](docs/installation.md).
+
+## Installer Skill
+
+The public installer skill bootstraps `skill-hub-manager`; it does **not** contain private skills, private vault content, or other sensitive assets.
+
+It detects the current setup in this order:
+
+1. existing checkout wrapper: `./bin/skill-hub`
+2. installed command on `PATH`: `skill-hub`
+3. public repo clone when no local checkout exists, after explicit confirmation
+4. update of an existing checkout after explicit confirmation
+5. sync of the selected profile after explicit confirmation of the target directory
+
+Before any `clone`, `update`, or `sync`, the agent should ask for confirmation and show the exact path or target it plans to touch.
+
+For manual CLI and agent-driven install examples, see [installation.md](docs/installation.md).
 
 ## Current CLI
 

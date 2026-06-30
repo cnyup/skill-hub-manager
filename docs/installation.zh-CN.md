@@ -4,6 +4,51 @@
 
 当前项目支持两种实际可用的 `skill-hub` 运行方式。
 
+## 基于 Skill 的安装流程
+
+公共 installer skill 只负责引导安装和使用 `skill-hub-manager`，不会包含任何私有 skills、私有 vault 内容或其他敏感资产。
+
+检测顺序如下：
+
+1. 如果 `./bin/skill-hub` 可用，就优先使用 checkout wrapper。
+2. 否则使用 `PATH` 中已安装的 `skill-hub` 命令。
+3. 如果两者都没有，先确认再 clone 公开仓库到本地工作区。
+4. 在更新已有 checkout 之前，先请求明确确认。
+5. 在同步到目标目录之前，先请求明确确认。
+
+## 手动 CLI 示例
+
+从 checkout 直接运行时：
+
+```bash
+./bin/skill-hub init --root ~/.skill-hub
+./bin/skill-hub registry build --root ~/.skill-hub
+./bin/skill-hub sync --root ~/.skill-hub --target ~/.codex/skills --dry-run
+./bin/skill-hub sync --root ~/.skill-hub --target ~/.codex/skills
+```
+
+在正常工作站上安装后直接使用命令：
+
+```bash
+python3 -m pip install -e .
+skill-hub init --root ~/.skill-hub
+skill-hub sync --root ~/.skill-hub --target ~/.codex/skills
+```
+
+## Agent 驱动安装示例
+
+当 agent 负责安装时，也应遵循相同的检测顺序，并且在修改外部内容前暂停确认：
+
+```text
+1. 检测是否已经存在 checkout wrapper。
+2. 检测 `PATH` 中是否已有 `skill-hub` 命令。
+3. 如果两者都没有，先确认再 clone 公开仓库。
+4. 如果已有 checkout 需要更新，先确认再修改。
+5. 如果需要 sync，先确认再写入目标目录。
+```
+
+agent 安装的是公开 manager，不是私有 skills。
+
 ## 方式一：从代码仓库直接运行 Wrapper
 
 这条路径不依赖 `setuptools` 之类的 Python 打包工具。

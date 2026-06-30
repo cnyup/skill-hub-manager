@@ -18,6 +18,84 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("skill-hub", output.getvalue())
 
+    def test_agent_detect_json_output_for_builtin_mapping(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["agent", "detect", "--root", str(root), "--agent", "codex", "--json"])
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(payload["detected"])
+        self.assertEqual(payload["agent"], "codex")
+        self.assertEqual(payload["confidence"], "medium")
+        self.assertEqual(payload["reason"], "builtin-agent-mapping")
+        self.assertEqual(payload["target_dir"], str(Path.home() / ".codex" / "skills"))
+
+    def test_install_state_record_and_show_round_trip(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            record_output = io.StringIO()
+
+            with contextlib.redirect_stdout(record_output):
+                record_exit_code = main(
+                    [
+                        "install-state",
+                        "record",
+                        "--root",
+                        str(root),
+                        "--agent",
+                        "codex",
+                        "--profile",
+                        "codex",
+                        "--target",
+                        "/tmp/codex-skills",
+                        "--manager-path",
+                        "/tmp/skill-hub-manager",
+                        "--manager-repo",
+                        "https://github.com/cnyup/skill-hub-manager.git",
+                        "--manager-revision",
+                        "abc123",
+                        "--detection-confidence",
+                        "high",
+                        "--detection-reason",
+                        "previous-install-record",
+                    ]
+                )
+
+            show_output = io.StringIO()
+            with contextlib.redirect_stdout(show_output):
+                show_exit_code = main(["install-state", "show", "--root", str(root), "--agent", "codex", "--json"])
+
+        payload = json.loads(show_output.getvalue())
+        self.assertEqual(record_exit_code, 0)
+        self.assertEqual(show_exit_code, 0)
+        self.assertIn("recorded:", record_output.getvalue())
+        self.assertEqual(payload["record"]["agent"], "codex")
+        self.assertEqual(payload["record"]["profile"], "codex")
+        self.assertEqual(payload["record"]["target_dir"], "/tmp/codex-skills")
+        self.assertEqual(payload["record"]["manager_path"], "/tmp/skill-hub-manager")
+        self.assertEqual(payload["record"]["manager_repo"], "https://github.com/cnyup/skill-hub-manager.git")
+        self.assertEqual(payload["record"]["manager_revision"], "abc123")
+        self.assertEqual(payload["record"]["detection_confidence"], "high")
+        self.assertEqual(payload["record"]["detection_reason"], "previous-install-record")
+        self.assertEqual(payload["records"], [payload["record"]])
+
+    def test_install_state_show_json_missing_agent_returns_nonzero(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["install-state", "show", "--root", str(root), "--agent", "codex", "--json"])
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(payload["records"], [])
+        self.assertIsNone(payload["record"])
+
     def test_scan_command_lists_skills(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

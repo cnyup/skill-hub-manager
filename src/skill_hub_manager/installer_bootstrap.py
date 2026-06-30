@@ -34,6 +34,16 @@ def ensure_manager_checkout(repo_url: str, checkout_dir: Path, update: bool) -> 
     return checkout_dir
 
 
+def _get_manager_revision(checkout_dir: Path) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(checkout_dir), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
 def run_install_flow(
     repo_url: str,
     checkout_dir: Path,
@@ -43,16 +53,25 @@ def run_install_flow(
     target_dir: Path,
     skills: list[str],
     update_manager: bool,
+    mode: str = "apply",
 ) -> None:
     checkout = ensure_manager_checkout(repo_url=repo_url, checkout_dir=checkout_dir, update=update_manager)
     cli = checkout / "bin" / "skill-hub"
     profile_path = workspace_root / "profiles" / f"{profile}.yaml"
 
-    subprocess.run([str(cli), "init", "--root", str(workspace_root)], check=True)
-    subprocess.run([str(cli), "registry", "build", "--root", str(workspace_root)], check=True)
+    if mode == "empty":
+        subprocess.run([str(cli), "init", "--root", str(workspace_root)], check=True)
+        subprocess.run([str(cli), "registry", "build", "--root", str(workspace_root)], check=True)
+        return
+
+    if mode != "apply":
+        raise ValueError(f"unsupported install mode: {mode}")
 
     if not skills:
         raise ValueError("skills must be confirmed before validate/sync")
+
+    subprocess.run([str(cli), "init", "--root", str(workspace_root)], check=True)
+    subprocess.run([str(cli), "registry", "build", "--root", str(workspace_root)], check=True)
 
     profile_add = [
         str(cli),
@@ -83,3 +102,30 @@ def run_install_flow(
         check=True,
     )
     subprocess.run([str(cli), "doctor", "--root", str(workspace_root)], check=True)
+    manager_revision = _get_manager_revision(checkout)
+    subprocess.run(
+        [
+            str(cli),
+            "install-state",
+            "record",
+            "--root",
+            str(workspace_root),
+            "--agent",
+            agent,
+            "--profile",
+            profile,
+            "--target",
+            str(target_dir),
+            "--manager-path",
+            str(checkout),
+            "--manager-repo",
+            repo_url,
+            "--manager-revision",
+            manager_revision,
+            "--detection-confidence",
+            "confirmed",
+            "--detection-reason",
+            "user-confirmed-target",
+        ],
+        check=True,
+    )

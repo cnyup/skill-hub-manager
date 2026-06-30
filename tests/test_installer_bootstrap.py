@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from subprocess import CompletedProcess
 from unittest.mock import patch
 
 from skill_hub_manager.installer_bootstrap import ensure_manager_checkout, run_install_flow
@@ -81,6 +82,7 @@ class InstallerBootstrapTests(unittest.TestCase):
             cli = checkout / "bin" / "skill-hub"
             cli.parent.mkdir(parents=True)
             cli.write_text("#!/bin/sh\n", encoding="utf-8")
+            run_mock.return_value = CompletedProcess(args=[], returncode=0, stdout="abc123\n")
 
             run_install_flow(
                 repo_url="https://github.com/cnyup/skill-hub-manager.git",
@@ -115,11 +117,67 @@ class InstallerBootstrapTests(unittest.TestCase):
             [str(cli), "profile", "validate", "--root", str(workspace), "--name", "codex"],
             [str(cli), "sync", "--root", str(workspace), "--profile", str(profile_path), "--target", str(target)],
             [str(cli), "doctor", "--root", str(workspace)],
+            ["git", "-C", str(checkout), "rev-parse", "HEAD"],
+            [
+                str(cli),
+                "install-state",
+                "record",
+                "--root",
+                str(workspace),
+                "--agent",
+                "codex",
+                "--profile",
+                "codex",
+                "--target",
+                str(target),
+                "--manager-path",
+                str(checkout),
+                "--manager-repo",
+                "https://github.com/cnyup/skill-hub-manager.git",
+                "--manager-revision",
+                "abc123",
+                "--detection-confidence",
+                "confirmed",
+                "--detection-reason",
+                "user-confirmed-target",
+            ],
         ]
         self.assertEqual([call.args[0] for call in run_mock.call_args_list], expected)
 
     @patch("subprocess.run")
-    def test_install_flow_with_empty_skills_fails_before_validate_or_sync(self, run_mock):
+    def test_install_flow_with_empty_mode_stops_before_profile_sync_and_record(self, run_mock):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            workspace = root / ".skill-hub"
+            checkout = root / "skill-hub-manager"
+            target = root / ".codex" / "skills"
+            cli = checkout / "bin" / "skill-hub"
+            cli.parent.mkdir(parents=True)
+            cli.write_text("#!/bin/sh\n", encoding="utf-8")
+
+            run_install_flow(
+                repo_url="https://github.com/cnyup/skill-hub-manager.git",
+                checkout_dir=checkout,
+                workspace_root=workspace,
+                profile="codex",
+                agent="codex",
+                target_dir=target,
+                skills=[],
+                update_manager=False,
+                mode="empty",
+            )
+
+        commands = [call.args[0] for call in run_mock.call_args_list]
+        self.assertEqual(
+            commands,
+            [
+                [str(cli), "init", "--root", str(workspace)],
+                [str(cli), "registry", "build", "--root", str(workspace)],
+            ],
+        )
+
+    @patch("subprocess.run")
+    def test_install_flow_rejects_empty_skills_in_apply_mode(self, run_mock):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             workspace = root / ".skill-hub"
@@ -141,14 +199,7 @@ class InstallerBootstrapTests(unittest.TestCase):
                     update_manager=False,
                 )
 
-        commands = [call.args[0] for call in run_mock.call_args_list]
-        self.assertEqual(
-            commands,
-            [
-                [str(cli), "init", "--root", str(workspace)],
-                [str(cli), "registry", "build", "--root", str(workspace)],
-            ],
-        )
+        self.assertEqual(run_mock.call_args_list, [])
 
     def test_detect_target_script_prints_json_payload(self):
         script = REPO_ROOT / "skills" / "install-skill-hub" / "scripts" / "detect_target.py"

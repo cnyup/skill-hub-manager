@@ -92,21 +92,82 @@ CLI 仍然保留，但更偏向底层能力和兜底路径。
 
 ## 快速使用
 
-大多数用户实际只需要下面 2 条 AI 入口：
+新用户的完整流程应该尽量都通过和 agent 对话完成。
+manager 本身不需要先暴露某个 skill 才能安装。
+你可以直接把 GitHub 仓库地址给 agent，让它按正常安装流程完成 manager 安装。
 
-1. 让一个已经能读取 `self-installer` 的 agent 安装 manager 本身：
+你可以直接先对 agent 说：
 
 ```text
-帮我安装这个 skills 管理器：
+帮我安装这个 skills 管理器，并完成初始化：
 https://github.com/cnyup/skill-hub-manager.git
+
+要求：
+- checkout 默认放在 ~/skill-hub-manager
+- workspace 默认使用 ~/.skill-hub
+- 在任何 clone、update、初始化之前先展示计划并征求确认
+- 安装完成后帮我给出验证命令
 ```
 
-2. 让一个已经能读取 `skill-installer` 的 agent 安装业务 skill：
+实际流程就是：
+
+1. 先让 agent 直接安装 `skill-hub-manager`
+2. manager 装好后，先把 `skills/skill-installer/` 暴露给 agent
+3. 然后再让 agent 去装你真正要用的业务 skill
+
+### 第一步：安装 manager
+
+直接对 agent 说：
+
+```text
+帮我安装这个 skills 管理器，并完成初始化：
+https://github.com/cnyup/skill-hub-manager.git
+
+要求：
+- checkout 默认放在 ~/skill-hub-manager
+- workspace 默认使用 ~/.skill-hub
+- 在任何 clone、update、初始化之前先展示计划并征求确认
+- 安装完成后帮我给出验证命令
+```
+
+agent 应该负责 clone 或复用现有 checkout、初始化本地 workspace，并告诉你后续验证命令。
+
+### 第二步：先把 `skill-installer` 软链到 agent 可识别的 skills 目录
+
+等 manager 已经存在本地后，让 agent 先把 `~/skill-hub-manager/skills/skill-installer/` 建立软链到 agent 可识别的 skills 目录里。
+默认说明如下：
+
+1. Codex 默认目录：`~/.codex/skills/`
+2. Claude Code 默认目录：`~/.claude/skills/`
+
+然后对 agent 说：
+
+```text
+请先把 `~/skill-hub-manager/skills/skill-installer/` 通过软链暴露给当前 agent。
+默认目标目录：
+- Codex 使用 ~/.codex/skills/
+- Claude Code 使用 ~/.claude/skills/
+
+如果你需要修改目标目录，或者要覆盖现有同名链接，先把计划展示给我确认。
+```
+
+### 第三步：安装你真正需要的业务 skill
+
+等 `skill-installer` 已经暴露成功后，再把具体 skill 发给 agent：
 
 ```text
 帮我把这个 skill 安装到我的 skill-hub workspace：
 https://github.com/example-org/example-repo/tree/main/skills/web-access
 ```
+
+agent 应该负责解析来源、把 skill 导入到 `~/.skill-hub/skills/`、重建 registry，并且在任何 profile 更新或 sync 之前先征求确认。
+
+### 第四步：让对应 agent 看见它
+
+如果你希望某个 agent 能使用这个 skill，再让 agent 处理 profile 和 sync。
+只要你走的是 agent 流程，就不需要自己手工执行 `skill import`、`registry build` 或 `sync`。
+
+### CLI 兜底路径
 
 如果你不走 agent，才使用 CLI 作为兜底路径：
 
@@ -234,12 +295,12 @@ skill-hub --version
 
 ## 仓库自带 Skills
 
-当前仓库自带 2 个公开 skill：
+当前仓库里和安装链路相关的公开 skill 主要是：
 
-1. `self-installer`
-   负责把 `skill-hub-manager` 自身从 Git 仓库安装或更新到当前机器。这是唯一的公开 bootstrap 入口。
-2. `skill-installer`
+1. `skill-installer`
    负责把普通业务 skill 导入到已经存在的 skill-hub-manager workspace，并可选更新 profile 与执行 sync。
+2. `self-installer`
+   仍然保留在仓库中，但不再作为推荐的新用户入口。manager 本身更适合让 agent 直接根据 GitHub 仓库地址执行安装。
 
 这些 skill 都是公开的，不包含任何私有 vault 内容。
 
@@ -268,15 +329,21 @@ https://github.com/example-org/example-repo/tree/main/skills/web-access
 
 推荐的 agent 驱动流程：
 
-1. 先把 `skills/self-installer/` 暴露到一个 agent 已经能读取的 skills 目录。
+1. 直接把 manager 仓库地址交给 agent。
 2. 然后直接对 agent 说：
 
 ```text
-帮我安装这个 skills 管理器：
+帮我安装这个 skills 管理器，并完成初始化：
 https://github.com/cnyup/skill-hub-manager.git
+
+要求：
+- checkout 默认放在 ~/skill-hub-manager
+- workspace 默认使用 ~/.skill-hub
+- 在任何 clone、update、初始化之前先展示计划并征求确认
+- 安装完成后帮我给出验证命令
 ```
 
-3. `self-installer` 应该执行：
+3. agent 应该执行：
    - 检测或推断 checkout 路径、workspace 根目录
    - 先展示完整计划
    - 在任何 clone、update、workspace 初始化之前先向用户确认
@@ -288,7 +355,7 @@ https://github.com/cnyup/skill-hub-manager.git
 ~/skill-hub-manager/bin/skill-hub registry doctor --root ~/.skill-hub
 ```
 
-如果你当前还没有一个 agent 可读取的 skills 目录，那么先走 [installation.zh-CN.md](docs/installation.zh-CN.md) 里的手动 CLI 安装路径，之后再暴露 `self-installer`。
+如果你当前还没有合适的 agent 文件系统权限，才退回到 [installation.zh-CN.md](docs/installation.zh-CN.md) 里的 CLI 路径。
 
 ## 当前 CLI 能力
 

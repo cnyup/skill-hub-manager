@@ -6,23 +6,27 @@ This project currently supports two practical ways to run `skill-hub`.
 
 ## Skill-Based Flow
 
-The repository ships one public installer skill:
+This is the agent-first flow. The user should only need to talk to an agent.
 
-1. `self-installer`
-   Bootstrap `skill-hub-manager` itself from a repository URL.
-
-The skill contains no private skills or private vault content.
+Installing the manager itself should not require exposing a bootstrap skill first.
+The recommended path is to give the GitHub repository URL directly to the agent and let it perform a normal install flow.
 
 ### Recommended Bootstrap Flow
 
-If your agent can already read `self-installer`, send:
+Send:
 
 ```text
-Install this skills manager:
+Install this skills manager and initialize it:
 https://github.com/cnyup/skill-hub-manager.git
+
+Requirements:
+- use ~/skill-hub-manager as the default checkout path
+- use ~/.skill-hub as the default workspace
+- show the plan and ask for confirmation before any clone, update, or initialization
+- show me the validation commands after install
 ```
 
-The skill should:
+The agent should:
 
 1. detect or infer checkout path and workspace root
 2. show the exact plan first
@@ -40,7 +44,8 @@ Verify the final result:
 
 ### If You Do Not Yet Have Any Agent-Readable Skill Directory
 
-Use the manual CLI path below first. After the manager is installed, you can expose `skills/self-installer/` to the agent.
+Use the manual CLI path below first.
+After the manager is installed, expose `skills/skill-installer/` to the agent so future business skill installs can stay conversational.
 
 ## Installing Business Skills
 
@@ -60,6 +65,9 @@ The installer should:
 5. rebuild the registry
 6. optionally update a profile with `profile update --add-skill`
 7. optionally run `sync`
+
+If you want the skill visible to a specific agent, keep talking to the agent and ask it to update the relevant profile and sync target.
+Do not run those steps yourself unless you are using the CLI fallback.
 
 If the repository uses a non-default branch, tag, commit, or a custom skill path, supply an explicit git ref and source subpath.
 This is especially important when a GitHub tree URL uses a branch name containing `/`, such as `feature/demo`.

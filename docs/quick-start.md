@@ -1,5 +1,8 @@
 # Quick Start
 
+This page documents the manual CLI fallback.
+If you are a new user and want the agent-first path, follow the README quick usage section instead.
+
 ## 0. Choose How To Run The CLI
 
 From a local checkout, the simplest path is the bundled wrapper:

@@ -92,21 +92,82 @@ The CLI still exists, but mainly as a low-level interface and fallback path.
 
 ## Quick Usage
 
-Most users only need these two AI entrypoints:
+For a new user, the entire flow should happen through conversation with an agent.
+Installing the manager itself should not require exposing a bootstrap skill first.
+You can give the GitHub repository URL directly to the agent and let it perform a normal install flow.
 
-1. Install the manager itself through an agent that can already read `self-installer`:
+You can say this to the agent first:
 
 ```text
-Install this skills manager:
+Install this skills manager and initialize it:
 https://github.com/cnyup/skill-hub-manager.git
+
+Requirements:
+- use ~/skill-hub-manager as the default checkout path
+- use ~/.skill-hub as the default workspace
+- show the plan and ask for confirmation before any clone, update, or initialization
+- show me the validation commands after install
 ```
 
-2. Install a business skill through an agent that can already read `skill-installer`:
+In practice, that means:
+
+1. let the agent install `skill-hub-manager` directly
+2. after the manager is installed, expose `skills/skill-installer/` to the agent
+3. then let the agent install the business skill you actually want
+
+### Step 1: install the manager
+
+Tell the agent:
+
+```text
+Install this skills manager and initialize it:
+https://github.com/cnyup/skill-hub-manager.git
+
+Requirements:
+- use ~/skill-hub-manager as the default checkout path
+- use ~/.skill-hub as the default workspace
+- show the plan and ask for confirmation before any clone, update, or initialization
+- show me the validation commands after install
+```
+
+The agent should clone or reuse the checkout, initialize the local workspace, and show you the next validation commands.
+
+### Step 2: symlink `skill-installer` into an agent-readable skills directory
+
+After the manager exists locally, ask the agent to create a symlink from `~/skill-hub-manager/skills/skill-installer/` into an agent-readable skills directory.
+The default targets are:
+
+1. Codex: `~/.codex/skills/`
+2. Claude Code: `~/.claude/skills/`
+
+Then tell the agent:
+
+```text
+Please expose `~/skill-hub-manager/skills/skill-installer/` to this agent via a symlink.
+Default target directories:
+- Codex uses ~/.codex/skills/
+- Claude Code uses ~/.claude/skills/
+
+If you need to change the target directory or overwrite an existing link, show me the plan first.
+```
+
+### Step 3: install the business skill you actually want
+
+After `skill-installer` is available, send the skill source:
 
 ```text
 Install this skill into my skill-hub workspace:
 https://github.com/example-org/example-repo/tree/main/skills/web-access
 ```
+
+The agent should resolve the source, import the skill into `~/.skill-hub/skills/`, rebuild the registry, and ask before any profile update or sync.
+
+### Step 4: expose the right profile
+
+If you want the skill available to a specific agent, tell the agent which profile to update and which target directory to sync.
+You do not need to run `skill import`, `registry build`, or `sync` yourself unless you are using the CLI fallback.
+
+### CLI fallback
 
 If you are not using an agent, use the CLI only as a fallback path:
 
@@ -121,8 +182,8 @@ If the skill source is a remote repository URL, let `skills/skill-installer/scri
 
 ## What To Do Right After Installation
 
-If you just installed the manager locally, the recommended next step is not to start typing commands manually.
-Instead, immediately tell the agent which line you want:
+If you just installed the manager locally, do not start by typing CLI commands.
+Instead, tell the agent which of these you want:
 
 1. adopt existing local skills for Codex
 2. install new remote skills for Claude Code
@@ -235,12 +296,12 @@ The full installation notes are in [installation.md](docs/installation.md).
 
 ## Built-In Skills
 
-This repository currently ships two public built-in skills:
+This repository ships these public skills related to installation:
 
-1. `self-installer`
-   Installs or updates `skill-hub-manager` itself from a Git repository URL onto the current machine. This is the only public bootstrap entrypoint.
-2. `skill-installer`
+1. `skill-installer`
    Imports ordinary business skills into an existing skill-hub-manager workspace, then optionally updates a profile and runs sync.
+2. `self-installer`
+   Still exists in the repository, but is no longer the recommended entrypoint for new users. For manager installation, it is simpler to let the agent work directly from the GitHub repository URL.
 
 These skills are public and contain no private vault content.
 
@@ -269,15 +330,21 @@ This is especially important for GitHub tree URLs whose branch names contain `/`
 
 Recommended agent-driven flow:
 
-1. Expose `skills/self-installer/` to an agent-readable skills directory you already control.
+1. Give the manager repository URL to the agent.
 2. Ask the agent:
 
 ```text
-Install this skills manager:
+Install this skills manager and initialize it:
 https://github.com/cnyup/skill-hub-manager.git
+
+Requirements:
+- use ~/skill-hub-manager as the default checkout path
+- use ~/.skill-hub as the default workspace
+- show the plan and ask for confirmation before any clone, update, or initialization
+- show me the validation commands after install
 ```
 
-3. The `self-installer` skill should:
+3. The agent should:
    - detect or infer checkout path and workspace root
    - show the exact plan first
    - ask for confirmation before any clone, update, or workspace initialization
@@ -289,7 +356,7 @@ https://github.com/cnyup/skill-hub-manager.git
 ~/skill-hub-manager/bin/skill-hub registry doctor --root ~/.skill-hub
 ```
 
-If you do not already have an agent-readable skills directory, use the manual CLI flow in [installation.md](docs/installation.md) first, then expose `self-installer` later.
+If the agent does not have the filesystem access needed to clone or initialize locally, use the CLI flow in [installation.md](docs/installation.md) instead.
 
 ## Current CLI
 

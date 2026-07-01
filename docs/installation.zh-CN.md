@@ -6,23 +6,27 @@
 
 ## 基于 Skill 的安装流程
 
-仓库自带 1 个和安装相关的公开 skill：
+这是面向 agent 的流程。用户只需要和 agent 对话。
 
-1. `self-installer`
-   负责把 `skill-hub-manager` 自身从仓库 URL bootstrap 到当前机器。
-
-这个 skill 不包含任何私有 skills 或私有 vault 内容。
+manager 本身不要求先暴露某个 bootstrap skill。
+更推荐的方式是：直接把 GitHub 仓库 URL 交给 agent，让 agent 按正常安装流程完成 checkout、初始化和验证。
 
 ### 推荐的 Bootstrap 流程
 
-如果你的 agent 已经能读取 `self-installer`，直接发送：
+直接发送：
 
 ```text
-帮我安装这个 skills 管理器：
+帮我安装这个 skills 管理器，并完成初始化：
 https://github.com/cnyup/skill-hub-manager.git
+
+要求：
+- checkout 默认放在 ~/skill-hub-manager
+- workspace 默认使用 ~/.skill-hub
+- 在任何 clone、update、初始化之前先展示计划并征求确认
+- 安装完成后帮我给出验证命令
 ```
 
-这条 skill 应该执行：
+agent 应该执行：
 
 1. 检测或推断 checkout 路径、workspace 根目录
 2. 先展示完整计划
@@ -40,11 +44,29 @@ https://github.com/cnyup/skill-hub-manager.git
 
 ### 如果你当前还没有任何 Agent 可读取的 Skills 目录
 
-先使用下面的手动 CLI 安装方式。manager 装好后，再把 `skills/self-installer/` 暴露给 agent。
+先使用下面的手动 CLI 安装方式。
+manager 装好后，再把 `skills/skill-installer/` 暴露给 agent，这样后续业务 skill 安装就能继续通过对话完成。
 
 ## 安装业务 Skills
 
-当本地已经有 manager 之后，把 `skills/skill-installer/` 暴露给 agent，并发送类似请求：
+当本地已经有 manager 之后，先让 agent 把 `~/skill-hub-manager/skills/skill-installer/` 通过软链放到它可识别的 skills 目录里。
+默认说明如下：
+
+1. Codex 默认目录：`~/.codex/skills/`
+2. Claude Code 默认目录：`~/.claude/skills/`
+
+你可以先发送：
+
+```text
+请先把 `~/skill-hub-manager/skills/skill-installer/` 通过软链暴露给当前 agent。
+默认目标目录：
+- Codex 使用 ~/.codex/skills/
+- Claude Code 使用 ~/.claude/skills/
+
+如果你需要修改目标目录，或者要覆盖现有同名链接，先把计划展示给我确认。
+```
+
+等暴露完成后，再发送类似请求：
 
 ```text
 帮我把这个 skill 安装到我的 skill-hub workspace：
@@ -60,6 +82,9 @@ https://github.com/example-org/example-repo/tree/main/skills/web-access
 5. 重建 registry
 6. 可选通过 `profile update --add-skill` 更新 profile
 7. 可选执行 `sync`
+
+如果你希望某个具体 agent 能看到这个 skill，就继续告诉 agent 去更新对应 profile 和 sync 目标目录。
+除非你明确要走 CLI 兜底路径，否则这些步骤不需要你自己手工执行。
 
 如果仓库使用了非默认分支、tag、commit，或者 skill 在自定义路径下，建议显式给出 git ref 和 source subpath。
 如果 GitHub tree URL 对应的分支名本身带 `/`，例如 `feature/demo`，更不要依赖自动猜测。

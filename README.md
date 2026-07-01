@@ -61,6 +61,150 @@ The real skill content lives in a local vault outside the repo, and this project
 
 The important detail is that the real skill content stays in one place. `sync` only projects the allowed subset into each agent's target directory.
 
+## Why Use It
+
+This project solves four concrete problems:
+
+1. Keep one real copy of each skill instead of duplicating the same skills across agents and projects.
+2. Control exposure per agent, for example one set for Codex and another set for Claude Code.
+3. Bring both local skills and remote skills into one managed workspace.
+4. Let agents operate the manager through conversation instead of forcing users to live in the terminal.
+
+## Recommended Usage Model
+
+The default design principle of this project is: **the user talks to AI, and the AI operates the manager.**
+
+In normal usage, the user should not need to keep typing low-level commands such as:
+
+- `init`
+- `skill import`
+- `registry build`
+- `profile add/update`
+- `sync`
+
+The preferred flow is:
+
+1. let an agent install `skill-hub-manager`
+2. let an agent install or adopt skills
+3. let an agent sync the right profile into the right agent directory
+
+The CLI still exists, but mainly as a low-level interface and fallback path.
+
+## Quick Usage
+
+Most users only need these two AI entrypoints:
+
+1. Install the manager itself through an agent that can already read `self-installer`:
+
+```text
+Install this skills manager:
+https://github.com/cnyup/skill-hub-manager.git
+```
+
+2. Install a business skill through an agent that can already read `skill-installer`:
+
+```text
+Install this skill into my skill-hub workspace:
+https://github.com/example-org/example-repo/tree/main/skills/web-access
+```
+
+If you are not using an agent, use the CLI only as a fallback path:
+
+```bash
+./bin/skill-hub init --root ~/.skill-hub
+./bin/skill-hub skill import --root ~/.skill-hub --source /path/to/local-skill
+./bin/skill-hub registry build --root ~/.skill-hub
+./bin/skill-hub sync --root ~/.skill-hub --target ~/.codex/skills
+```
+
+If the skill source is a remote repository URL, let `skills/skill-installer/scripts/install_skill.py` resolve and cache it first, then call `skill-hub skill import` on the resolved local directory.
+
+## What To Do Right After Installation
+
+If you just installed the manager locally, the recommended next step is not to start typing commands manually.
+Instead, immediately tell the agent which line you want:
+
+1. adopt existing local skills for Codex
+2. install new remote skills for Claude Code
+
+You only need to tell the agent:
+
+- where the skills come from
+- which agent should receive them
+- whether you want a plan shown before execution
+
+The manager and installer skills should handle the rest.
+
+## Real AI Workflows
+
+These are the two main workflows this project is built for.
+
+### Scenario 1: adopt your existing local skills and expose them to Codex
+
+Goal:
+
+- you already have local skills
+- you want them moved under one managed workspace
+- you want only the Codex subset exposed to Codex
+
+Recommended prompt to the agent:
+
+```text
+Help me adopt my existing local skills into skill-hub-manager.
+Use the default workspace ~/.skill-hub.
+Put the skills that are appropriate for Codex into a profile named codex,
+then sync that profile into the Codex skills directory.
+Before any operation that changes disk state, show me the plan and ask for confirmation.
+```
+
+The agent should:
+
+1. detect whether `skill-hub-manager` is already installed
+2. find your existing local skill directories
+3. import those skills into `~/.skill-hub/skills/`
+4. create or update the `codex` profile
+5. run sync so Codex sees the selected skills
+
+End result:
+
+- skills are centrally managed under `~/.skill-hub/skills/`
+- Codex reads only the synced projection
+- future updates happen in one source location
+
+### Scenario 2: download new remote skills and expose them to Claude Code
+
+Goal:
+
+- you found a remote skill repository
+- you want one or more skills installed locally
+- you want only the Claude Code subset exposed to Claude Code
+
+Recommended prompt to the agent:
+
+```text
+Help me install this remote skill into my skill-hub workspace,
+add it to a profile named claude-code,
+and sync that profile into the Claude Code skills directory:
+https://github.com/example-org/example-repo/tree/main/skills/web-access
+
+If the repository contains multiple skills, tell me what options you found first.
+Before any clone, update, profile change, or sync, show me the plan and ask for confirmation.
+```
+
+The agent should:
+
+1. resolve the Git repository URL or GitHub tree URL
+2. cache the remote repository under `~/.skill-hub/sources/`
+3. import the selected skill into `~/.skill-hub/skills/`
+4. create or update the `claude-code` profile
+5. run sync so Claude Code sees the selected skills
+
+End result:
+
+- the remote skill is cached locally and brought under one manager
+- Claude Code sees only the subset you allow
+- later updates can reuse the same source and run `update-source`
+
 ## What lives where
 
 - GitHub: manager code, examples, schemas, docs, tests
@@ -99,35 +243,6 @@ This repository currently ships two public built-in skills:
    Imports ordinary business skills into an existing skill-hub-manager workspace, then optionally updates a profile and runs sync.
 
 These skills are public and contain no private vault content.
-
-## Quick Usage
-
-Most users only need these three entrypoints:
-
-1. Install the manager itself through an agent that can already read `self-installer`:
-
-```text
-Install this skills manager:
-https://github.com/cnyup/skill-hub-manager.git
-```
-
-2. Install a business skill through an agent that can already read `skill-installer`:
-
-```text
-Install this skill into my skill-hub workspace:
-https://github.com/example-org/example-repo/tree/main/skills/web-access
-```
-
-3. If you are not using an agent, use the CLI directly:
-
-```bash
-./bin/skill-hub init --root ~/.skill-hub
-./bin/skill-hub skill import --root ~/.skill-hub --source /path/to/local-skill
-./bin/skill-hub registry build --root ~/.skill-hub
-./bin/skill-hub sync --root ~/.skill-hub --target ~/.codex/skills
-```
-
-If the skill source is a remote repository URL, let `skills/skill-installer/scripts/install_skill.py` resolve and cache it first, then call `skill-hub skill import` on the resolved local directory.
 
 ## Installing Business Skills
 

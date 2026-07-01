@@ -61,6 +61,149 @@
 
 最关键的一点是：真实的 skill 内容始终只保留一份。`sync` 做的只是把“允许给谁使用的那一部分”映射到对应 agent 的目标目录。
 
+## 为什么要用
+
+这个项目主要解决 4 个问题：
+
+1. 你的真实 skills 只保留一份，不再为多个 agent、多个项目复制多份副本。
+2. 你可以按 agent 分配权限，例如只给 Codex 一部分 skill，只给 Claude Code 另一部分 skill。
+3. 你可以从远程仓库安装新 skill，也可以把本地已有 skill 纳入统一管理。
+4. 整个流程可以尽量通过 agent 对话完成，而不是让用户自己长期手敲终端命令。
+
+## 推荐使用方式
+
+这个项目的默认设计理念是：**用户直接和 AI 沟通，AI 来操作这个管理器。**
+
+也就是说，正常使用时你不应该长期自己手敲这些命令：
+
+- `init`
+- `skill import`
+- `registry build`
+- `profile add/update`
+- `sync`
+
+更推荐的方式是：
+
+1. 先让 agent 安装 `skill-hub-manager`
+2. 再让 agent 安装或接管 skills
+3. 最后让 agent 把目标 profile 同步到对应 agent 目录
+
+CLI 仍然保留，但更偏向底层能力和兜底路径。
+
+## 快速使用
+
+大多数用户实际只需要下面 2 条 AI 入口：
+
+1. 让一个已经能读取 `self-installer` 的 agent 安装 manager 本身：
+
+```text
+帮我安装这个 skills 管理器：
+https://github.com/cnyup/skill-hub-manager.git
+```
+
+2. 让一个已经能读取 `skill-installer` 的 agent 安装业务 skill：
+
+```text
+帮我把这个 skill 安装到我的 skill-hub workspace：
+https://github.com/example-org/example-repo/tree/main/skills/web-access
+```
+
+如果你不走 agent，才使用 CLI 作为兜底路径：
+
+```bash
+./bin/skill-hub init --root ~/.skill-hub
+./bin/skill-hub skill import --root ~/.skill-hub --source /path/to/local-skill
+./bin/skill-hub registry build --root ~/.skill-hub
+./bin/skill-hub sync --root ~/.skill-hub --target ~/.codex/skills
+```
+
+如果 skill 来源是远程仓库 URL，先让 `skills/skill-installer/scripts/install_skill.py` 完成解析和缓存，再对解析出的本地目录调用 `skill-hub skill import`。
+
+## 安装后下一步该做什么
+
+如果你刚刚把 manager 安装到本地，最推荐的下一步不是手工敲命令，而是立刻告诉 agent 你要走哪条线：
+
+1. 接管本地已有 skills，给 Codex 用
+2. 下载新的 remote skills，给 Claude Code 用
+
+你只需要告诉 agent：
+
+- skill 来源在哪
+- 想给哪个 agent 用
+- 是否要先展示计划再执行
+
+剩下的事情交给这个管理器和 installer skills 去完成。
+
+## AI 实际用法
+
+下面两条就是这个项目最重要的实际使用路径。
+
+### 场景一：把你本地已有 skills 纳入统一管理，并给 Codex 使用
+
+目标：
+
+- 你本地已经有一批 skills
+- 你希望它们进入统一 workspace
+- 然后只同步一部分给 Codex 使用
+
+推荐直接对 agent 说：
+
+```text
+帮我把我本地已有的 skills 纳入 skill-hub-manager 管理。
+workspace 用默认的 ~/.skill-hub。
+把适合 Codex 使用的 skills 放到 codex 这个 profile，
+然后同步到 Codex 的 skills 目录。
+如果有任何会修改磁盘状态的操作，先把计划展示给我确认。
+```
+
+这条链路里，agent 应该完成：
+
+1. 检测 `skill-hub-manager` 是否已经安装
+2. 识别你现有的本地 skill 目录
+3. 把这些 skill 导入 `~/.skill-hub/skills/`
+4. 建立或更新 `codex` profile
+5. 执行 sync，把 profile 暴露到 Codex 目录
+
+最终效果是：
+
+- skill 内容在 `~/.skill-hub/skills/` 里统一管理
+- Codex 实际读取的是 sync 后的目标目录
+- 以后更新 skill，只需要维护一份源 skill
+
+### 场景二：下载新的 remote skills，并给 Claude Code 使用
+
+目标：
+
+- 你发现了一个远程 skill 仓库
+- 你想把其中一个或多个 skills 下载到本地
+- 再只同步给 Claude Code 使用
+
+推荐直接对 agent 说：
+
+```text
+帮我把这个远程 skill 安装到我的 skill-hub workspace，
+然后把它加入 claude-code 这个 profile，
+最后同步到 Claude Code 的 skills 目录：
+https://github.com/example-org/example-repo/tree/main/skills/web-access
+
+如果仓库里有多个 skills，先告诉我你识别到哪些可选项。
+如果有 clone、update、profile 变更或 sync，先展示计划给我确认。
+```
+
+这条链路里，agent 应该完成：
+
+1. 解析 Git 仓库 URL 或 GitHub tree URL
+2. 将远程仓库缓存到 `~/.skill-hub/sources/`
+3. 把目标 skill 导入 `~/.skill-hub/skills/`
+4. 建立或更新 `claude-code` profile
+5. 执行 sync，把 profile 暴露到 Claude Code 目录
+
+最终效果是：
+
+- 远程 skill 被本地缓存并纳入统一管理
+- Claude Code 只读取你允许它使用的那部分 skill
+- 后续更新时，agent 可以继续基于同一来源做 update-source
+
 ## 内容边界
 
 - GitHub：manager 代码、示例、schema、文档、测试
@@ -99,35 +242,6 @@ skill-hub --version
    负责把普通业务 skill 导入到已经存在的 skill-hub-manager workspace，并可选更新 profile 与执行 sync。
 
 这些 skill 都是公开的，不包含任何私有 vault 内容。
-
-## 快速使用
-
-大多数用户实际只需要下面 3 个入口：
-
-1. 让一个已经能读取 `self-installer` 的 agent 安装 manager 本身：
-
-```text
-帮我安装这个 skills 管理器：
-https://github.com/cnyup/skill-hub-manager.git
-```
-
-2. 让一个已经能读取 `skill-installer` 的 agent 安装业务 skill：
-
-```text
-帮我把这个 skill 安装到我的 skill-hub workspace：
-https://github.com/example-org/example-repo/tree/main/skills/web-access
-```
-
-3. 如果你不走 agent，直接用 CLI：
-
-```bash
-./bin/skill-hub init --root ~/.skill-hub
-./bin/skill-hub skill import --root ~/.skill-hub --source /path/to/local-skill
-./bin/skill-hub registry build --root ~/.skill-hub
-./bin/skill-hub sync --root ~/.skill-hub --target ~/.codex/skills
-```
-
-如果 skill 来源是远程仓库 URL，先让 `skills/skill-installer/scripts/install_skill.py` 完成解析和缓存，再对解析出的本地目录调用 `skill-hub skill import`。
 
 ## 第二条线：安装业务 Skills
 

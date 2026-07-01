@@ -6,49 +6,75 @@
 
 ## 基于 Skill 的安装流程
 
-公共 installer skill 只负责引导安装和使用 `skill-hub-manager`，不会包含任何私有 skills、私有 vault 内容或其他敏感资产。
+仓库自带 1 个和安装相关的公开 skill：
 
-### 如何实际使用 Installer Skill
+1. `self-installer`
+   负责把 `skill-hub-manager` 自身从仓库 URL bootstrap 到当前机器。
 
-1. 在新机器上先 clone 本仓库：
+这个 skill 不包含任何私有 skills 或私有 vault 内容。
 
-```bash
-git clone https://github.com/cnyup/skill-hub-manager.git ~/skill-hub-manager
-cd ~/skill-hub-manager
-```
+### 推荐的 Bootstrap 流程
 
-2. 把 installer skill 复制到目标 agent 已经会读取的 skills 目录：
-
-```bash
-mkdir -p ~/.codex/skills
-cp -R ~/skill-hub-manager/skills/install-skill-hub ~/.codex/skills/
-```
-
-3. 在 agent 中发送类似这样的请求：
+如果你的 agent 已经能读取 `self-installer`，直接发送：
 
 ```text
-使用 install-skill-hub 这个 skill。为 Codex 安装 skill-hub-manager，检测目标 skills 目录，并在任何 clone、update、sync 之前先向我确认路径，然后再同步选中的 profile。
+帮我安装这个 skills 管理器：
+https://github.com/cnyup/skill-hub-manager.git
 ```
 
-4. 在 agent 继续前，确认这些值：
-- manager checkout 路径
-- workspace 根目录，例如 `~/.skill-hub`
-- profile 名称，例如 `codex`
-- 目标 skills 目录，例如 `~/.codex/skills`
+这条 skill 应该执行：
 
-5. 安装结束后，执行下面的命令确认结果：
+1. 检测或推断 checkout 路径、workspace 根目录
+2. 先展示完整计划
+3. 在任何 clone、update、workspace 初始化之前先确认
+4. 本地安装 manager
+5. 初始化 workspace 并生成空 registry
+6. 展示后续验证命令
+
+最后用下面命令确认结果：
 
 ```bash
-~/skill-hub-manager/bin/skill-hub install-state show --root ~/.skill-hub --agent codex --json
+~/skill-hub-manager/bin/skill-hub --version
+~/skill-hub-manager/bin/skill-hub registry doctor --root ~/.skill-hub
 ```
 
-检测顺序如下：
+### 如果你当前还没有任何 Agent 可读取的 Skills 目录
 
-1. 如果 `./bin/skill-hub` 可用，就优先使用 checkout wrapper。
-2. 否则使用 `PATH` 中已安装的 `skill-hub` 命令。
-3. 如果两者都没有，先确认再 clone 公开仓库到本地工作区。
-4. 在更新已有 checkout 之前，先请求明确确认。
-5. 在同步到目标目录之前，先请求明确确认。
+先使用下面的手动 CLI 安装方式。manager 装好后，再把 `skills/self-installer/` 暴露给 agent。
+
+## 安装业务 Skills
+
+当本地已经有 manager 之后，把 `skills/skill-installer/` 暴露给 agent，并发送类似请求：
+
+```text
+帮我把这个 skill 安装到我的 skill-hub workspace：
+https://github.com/example-org/example-repo/tree/main/skills/web-access
+```
+
+这条安装器应该执行：
+
+1. 解析来源
+2. 将远程仓库缓存到 `~/.skill-hub/sources/`
+3. 从缓存中解析出本地 skill 目录
+4. 运行 `skill-hub skill import --root ~/.skill-hub --source <local-skill-dir>`
+5. 重建 registry
+6. 可选通过 `profile update --add-skill` 更新 profile
+7. 可选执行 `sync`
+
+如果仓库使用了非默认分支、tag、commit，或者 skill 在自定义路径下，建议显式给出 git ref 和 source subpath。
+如果 GitHub tree URL 对应的分支名本身带 `/`，例如 `feature/demo`，更不要依赖自动猜测。
+
+手动 CLI 示例：
+
+```bash
+./bin/skill-hub skill import --root ~/.skill-hub --source /path/to/skill-dir
+./bin/skill-hub registry build --root ~/.skill-hub
+./bin/skill-hub skill source list --root ~/.skill-hub
+./bin/skill-hub skill source show --root ~/.skill-hub --name web-access --json
+```
+
+`skill-hub skill import` 本身只接受本地 skill 目录。
+远程仓库 URL 的解析能力在 `skills/skill-installer/scripts/install_skill.py` 中。
 
 ## 手动 CLI 示例
 
@@ -78,7 +104,7 @@ skill-hub sync --root ~/.skill-hub --target ~/.codex/skills
 2. 检测 `PATH` 中是否已有 `skill-hub` 命令。
 3. 如果两者都没有，先确认再 clone 公开仓库。
 4. 如果已有 checkout 需要更新，先确认再修改。
-5. 如果需要 sync，先确认再写入目标目录。
+5. 在初始化或修复本地 workspace 之前，先确认 workspace 根目录。
 ```
 
 agent 安装的是公开 manager，不是私有 skills。

@@ -124,6 +124,210 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("k8s-finder", output.getvalue())
 
+    def test_skill_import_copies_local_skill_into_workspace_and_records_source(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            source = Path(temp_dir) / "incoming" / "web-access"
+            source.mkdir(parents=True)
+            (source / "SKILL.md").write_text("---\nname: web-access\n---\n", encoding="utf-8")
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "skill",
+                        "import",
+                        "--root",
+                        str(root),
+                        "--source",
+                        str(source),
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((root / "skills" / "web-access" / "SKILL.md").is_file())
+            self.assertTrue((root / "state" / "skill-sources.json").is_file())
+            self.assertIn("imported: web-access", output.getvalue())
+
+    def test_skill_import_json_reports_replacement(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            source = Path(temp_dir) / "incoming" / "web-access"
+            source.mkdir(parents=True)
+            (source / "SKILL.md").write_text("---\nname: web-access\n---\n", encoding="utf-8")
+            main(["skill", "import", "--root", str(root), "--source", str(source)])
+            (source / "NOTES.txt").write_text("updated", encoding="utf-8")
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "skill",
+                        "import",
+                        "--root",
+                        str(root),
+                        "--source",
+                        str(source),
+                        "--force",
+                        "--json",
+                    ]
+                )
+
+            payload = json.loads(output.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(payload["replaced"])
+            self.assertEqual(payload["skill"], "web-access")
+
+    def test_skill_import_refuses_overwrite_without_force(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            source = Path(temp_dir) / "incoming" / "web-access"
+            source.mkdir(parents=True)
+            (source / "SKILL.md").write_text("---\nname: web-access\n---\n", encoding="utf-8")
+            main(["skill", "import", "--root", str(root), "--source", str(source)])
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "skill",
+                        "import",
+                        "--root",
+                        str(root),
+                        "--source",
+                        str(source),
+                    ]
+                )
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn("exists:", output.getvalue())
+
+    def test_skill_import_json_reports_missing_skill_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            source = Path(temp_dir) / "incoming" / "web-access"
+            source.mkdir(parents=True)
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "skill",
+                        "import",
+                        "--root",
+                        str(root),
+                        "--source",
+                        str(source),
+                        "--json",
+                    ]
+                )
+
+            payload = json.loads(output.getvalue())
+            self.assertEqual(exit_code, 1)
+            self.assertFalse(payload["replaced"])
+            self.assertEqual(payload["skill"], "web-access")
+            self.assertIn("missing SKILL.md", payload["error"])
+
+    def test_skill_source_list_does_not_initialize_workspace(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["skill", "source", "list", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(output.getvalue(), "")
+            self.assertFalse((root / "profiles" / "default.yaml").exists())
+
+    def test_skill_source_show_missing_does_not_initialize_workspace(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "skill",
+                        "source",
+                        "show",
+                        "--root",
+                        str(root),
+                        "--name",
+                        "web-access",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 1)
+            self.assertIn("missing: web-access", output.getvalue())
+            self.assertFalse((root / "profiles" / "default.yaml").exists())
+
+    def test_skill_source_show_returns_record_metadata(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            source = Path(temp_dir) / "incoming" / "web-access"
+            source.mkdir(parents=True)
+            (source / "SKILL.md").write_text("---\nname: web-access\n---\n", encoding="utf-8")
+            main(
+                [
+                    "skill",
+                    "import",
+                    "--root",
+                    str(root),
+                    "--source",
+                    str(source),
+                    "--source-ref",
+                    "file:///tmp/example.git",
+                    "--source-type",
+                    "git-repo",
+                    "--repo-url",
+                    "file:///tmp/example.git",
+                    "--git-ref",
+                    "release",
+                    "--cache-checkout",
+                    "/tmp/cache/example",
+                    "--import-subpath",
+                    "skills/web-access",
+                ]
+            )
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "skill",
+                        "source",
+                        "show",
+                        "--root",
+                        str(root),
+                        "--name",
+                        "web-access",
+                        "--json",
+                    ]
+                )
+
+            payload = json.loads(output.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["record"]["source_type"], "git-repo")
+            self.assertEqual(payload["record"]["repo_url"], "file:///tmp/example.git")
+            self.assertEqual(payload["record"]["git_ref"], "release")
+            self.assertEqual(payload["record"]["import_subpath"], "skills/web-access")
+
+    def test_skill_source_list_prints_imported_skills(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            source = Path(temp_dir) / "incoming" / "web-access"
+            source.mkdir(parents=True)
+            (source / "SKILL.md").write_text("---\nname: web-access\n---\n", encoding="utf-8")
+            main(["skill", "import", "--root", str(root), "--source", str(source)])
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["skill", "source", "list", "--root", str(root)])
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("web-access", output.getvalue())
+
     def test_sync_command_links_profile_skills(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -398,6 +602,7 @@ class CliTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertTrue((root / "skills").is_dir())
+            self.assertTrue((root / "sources").is_dir())
             self.assertTrue((root / "profiles").is_dir())
             self.assertTrue((root / "state").is_dir())
             self.assertTrue((root / "profiles" / "default.yaml").is_file())

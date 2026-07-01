@@ -89,35 +89,92 @@ skill-hub --version
 
 完整安装说明见 [installation.zh-CN.md](docs/installation.zh-CN.md)。
 
-## Installer Skill
+## 仓库自带 Skills
 
-公共 installer skill 只负责引导安装和使用 `skill-hub-manager`，不会包含任何私有 skills、私有 vault 内容或其他敏感资产。
+当前仓库自带 2 个公开 skill：
 
-在新机器上使用 installer skill 的步骤：
+1. `self-installer`
+   负责把 `skill-hub-manager` 自身从 Git 仓库安装或更新到当前机器。这是唯一的公开 bootstrap 入口。
+2. `skill-installer`
+   负责把普通业务 skill 导入到已经存在的 skill-hub-manager workspace，并可选更新 profile 与执行 sync。
 
-1. 先把本仓库 clone 到本地，例如 `~/skill-hub-manager`。
-2. 将 `skills/install-skill-hub/` 复制到目标 agent 已经会读取的 skills 目录。
-3. 启动 agent，并明确要求它使用 `install-skill-hub` 来安装 `skill-hub-manager`。
-4. 在它继续前，确认它识别出的 checkout 路径、workspace 根目录、profile 名称和目标 skills 目录。
-5. 安装结束后，用 `skill-hub install-state show --root <workspace> --agent <agent> --json` 检查结果。
+这些 skill 都是公开的，不包含任何私有 vault 内容。
 
-给 agent 的示例指令：
+## 快速使用
+
+大多数用户实际只需要下面 3 个入口：
+
+1. 让一个已经能读取 `self-installer` 的 agent 安装 manager 本身：
 
 ```text
-使用 install-skill-hub 这个 skill。为 Codex 安装 skill-hub-manager，检测目标 skills 目录，并在任何 clone、update、sync 之前先向我确认路径，然后再同步选中的 profile。
+帮我安装这个 skills 管理器：
+https://github.com/cnyup/skill-hub-manager.git
 ```
 
-它通常按以下顺序检测当前环境：
+2. 让一个已经能读取 `skill-installer` 的 agent 安装业务 skill：
 
-1. 已存在的 checkout wrapper：`./bin/skill-hub`
-2. `PATH` 中已安装的命令：`skill-hub`
-3. 如果本地没有 checkout，则先确认再 clone 公开仓库
-4. 在更新现有 checkout 之前，先获得明确确认
-5. 在同步选定 profile 之前，先确认目标目录
+```text
+帮我把这个 skill 安装到我的 skill-hub workspace：
+https://github.com/example-org/example-repo/tree/main/skills/web-access
+```
 
-在执行任何 `clone`、`update` 或 `sync` 之前，agent 都应先询问确认，并明确展示即将操作的路径或目标目录。
+3. 如果你不走 agent，直接用 CLI：
 
-手动 CLI 和 agent-driven install 的示例见 [installation.zh-CN.md](docs/installation.zh-CN.md)。
+```bash
+./bin/skill-hub init --root ~/.skill-hub
+./bin/skill-hub skill import --root ~/.skill-hub --source /path/to/local-skill
+./bin/skill-hub registry build --root ~/.skill-hub
+./bin/skill-hub sync --root ~/.skill-hub --target ~/.codex/skills
+```
+
+如果 skill 来源是远程仓库 URL，先让 `skills/skill-installer/scripts/install_skill.py` 完成解析和缓存，再对解析出的本地目录调用 `skill-hub skill import`。
+
+## 第二条线：安装业务 Skills
+
+manager 装好以后，第二条线使用 `skill-installer`：
+
+```text
+帮我把这个 skill 安装到我的 skill-hub workspace：
+https://github.com/example-org/example-repo/tree/main/skills/web-access
+```
+
+`skill-installer` 应该执行：
+
+1. 解析本地路径、Git 仓库 URL 或 GitHub tree URL
+2. 将远程仓库缓存到 `~/.skill-hub/sources/`
+3. 把选中的 skill 导入到 `~/.skill-hub/skills/`
+4. 重建 registry
+5. 可选把 skill 加入某个 profile
+6. 可选把更新后的 profile sync 到目标目录
+
+如果远程来源使用了非默认分支、tag、commit，或者 skill 不在标准路径下，优先显式给出 git ref 和 source subpath。
+这一点对 GitHub tree URL 尤其重要，分支名如果带 `/`，例如 `feature/demo`，不要依赖自动猜测。
+
+## 现在该如何安装这个管理器
+
+推荐的 agent 驱动流程：
+
+1. 先把 `skills/self-installer/` 暴露到一个 agent 已经能读取的 skills 目录。
+2. 然后直接对 agent 说：
+
+```text
+帮我安装这个 skills 管理器：
+https://github.com/cnyup/skill-hub-manager.git
+```
+
+3. `self-installer` 应该执行：
+   - 检测或推断 checkout 路径、workspace 根目录
+   - 先展示完整计划
+   - 在任何 clone、update、workspace 初始化之前先向用户确认
+   - 安装 manager
+4. 安装完成后，用下面命令验证：
+
+```bash
+~/skill-hub-manager/bin/skill-hub --version
+~/skill-hub-manager/bin/skill-hub registry doctor --root ~/.skill-hub
+```
+
+如果你当前还没有一个 agent 可读取的 skills 目录，那么先走 [installation.zh-CN.md](docs/installation.zh-CN.md) 里的手动 CLI 安装路径，之后再暴露 `self-installer`。
 
 ## 当前 CLI 能力
 
@@ -125,6 +182,9 @@ skill-hub --version
 
 - `skill-hub --version`
 - `skill-hub init --root <path>`
+- `skill-hub skill import --root <path> --source <path> [--name <skill>] [--force] [--json]`
+- `skill-hub skill source list --root <path> [--json]`
+- `skill-hub skill source show --root <path> --name <skill> [--json]`
 - `skill-hub registry build --root <path>`
 - `skill-hub registry doctor --root <path> [--json] [--rebuild-if-drift]`
 - `skill-hub scan --root <path>`
@@ -152,6 +212,37 @@ skill-hub --version
 
 ```bash
 PYTHONPATH=src python3 -m skill_hub_manager.cli init --root /Users/yup/.skill-hub
+```
+
+将本地 skill 导入 workspace：
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli skill import \
+  --root /Users/yup/.skill-hub \
+  --source /Users/yup/skills/web-access
+```
+
+对一个已经在本地解析并缓存好的远程 skill 记录来源元数据：
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli skill import \
+  --root /Users/yup/.skill-hub \
+  --source /Users/yup/.skill-hub/sources/example-repo/skills/web-access \
+  --source-ref https://github.com/example-org/example-repo/tree/main/skills/web-access \
+  --source-type github-tree \
+  --repo-url https://github.com/example-org/example-repo.git \
+  --cache-checkout /Users/yup/.skill-hub/sources/example-org_example-repo@main \
+  --import-subpath skills/web-access
+```
+
+`skill-hub skill import` 本身只负责导入本地目录。
+远程仓库的解析、clone/update 和缓存管理由 `skills/skill-installer/scripts/install_skill.py` 负责。
+
+查看已导入 skill 的来源记录：
+
+```bash
+PYTHONPATH=src python3 -m skill_hub_manager.cli skill source list --root /Users/yup/.skill-hub
+PYTHONPATH=src python3 -m skill_hub_manager.cli skill source show --root /Users/yup/.skill-hub --name web-access --json
 ```
 
 ## Registry 管理

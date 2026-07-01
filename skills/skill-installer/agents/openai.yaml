@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skill Installer"
+  short_description: "Import a business skill into an existing skill-hub-manager workspace."
+  default_prompt: "Install a business skill into the existing skill-hub-manager workspace. Confirm the source path, cache path, workspace root, optional profile update, and optional sync target with me before any clone, pull, profile update, or sync action."

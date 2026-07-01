@@ -1,4 +1,0 @@
-interface:
-  display_name: "Skill Hub Installer"
-  short_description: "Detect, confirm, and install the skill-hub package into a workspace"
-  default_prompt: "Detect the target workspace first, ask the user to confirm it, then run the installer flow without overwriting curated profile skill lists."

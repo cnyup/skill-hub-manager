@@ -6,49 +6,75 @@ This project currently supports two practical ways to run `skill-hub`.
 
 ## Skill-Based Flow
 
-The public installer skill bootstraps the manager only. It does not contain private skills, private vault content, or other sensitive assets.
+The repository ships one public installer skill:
 
-### How To Use The Installer Skill
+1. `self-installer`
+   Bootstrap `skill-hub-manager` itself from a repository URL.
 
-1. Clone this repository on the new machine:
+The skill contains no private skills or private vault content.
 
-```bash
-git clone https://github.com/cnyup/skill-hub-manager.git ~/skill-hub-manager
-cd ~/skill-hub-manager
-```
+### Recommended Bootstrap Flow
 
-2. Copy the installer skill into a skill directory your agent already reads:
-
-```bash
-mkdir -p ~/.codex/skills
-cp -R ~/skill-hub-manager/skills/install-skill-hub ~/.codex/skills/
-```
-
-3. In the agent, send a request like:
+If your agent can already read `self-installer`, send:
 
 ```text
-Use the install-skill-hub skill. Install skill-hub-manager for Codex, detect the target skills directory, ask me to confirm every clone, update, and sync path, then sync the selected profile.
+Install this skills manager:
+https://github.com/cnyup/skill-hub-manager.git
 ```
 
-4. Confirm these values before the agent proceeds:
-- manager checkout path
-- workspace root such as `~/.skill-hub`
-- profile name such as `codex`
-- target skills directory such as `~/.codex/skills`
+The skill should:
 
-5. Verify the final result:
+1. detect or infer checkout path and workspace root
+2. show the exact plan first
+3. ask for confirmation before any clone, update, or workspace initialization
+4. install the manager locally
+5. initialize the workspace and build an empty registry
+6. show the next validation commands
+
+Verify the final result:
 
 ```bash
-~/skill-hub-manager/bin/skill-hub install-state show --root ~/.skill-hub --agent codex --json
+~/skill-hub-manager/bin/skill-hub --version
+~/skill-hub-manager/bin/skill-hub registry doctor --root ~/.skill-hub
 ```
 
-Detection order:
+### If You Do Not Yet Have Any Agent-Readable Skill Directory
 
-1. Use the checkout wrapper if `./bin/skill-hub` is available.
-2. Otherwise use an installed `skill-hub` command on `PATH`.
-3. Otherwise ask before cloning the public repository into a local workspace.
-4. Before any update to an existing checkout, ask for explicit confirmation.
-5. Before any sync to a target directory, ask for explicit confirmation.
+Use the manual CLI path below first. After the manager is installed, you can expose `skills/self-installer/` to the agent.
+
+## Installing Business Skills
+
+After the manager exists locally, expose `skills/skill-installer/` to the agent and send a request like:
+
+```text
+Install this skill into my skill-hub workspace:
+https://github.com/example-org/example-repo/tree/main/skills/web-access
+```
+
+The installer should:
+
+1. resolve the source
+2. cache remote repositories under `~/.skill-hub/sources/`
+3. resolve a local skill directory from that cache
+4. run `skill-hub skill import --root ~/.skill-hub --source <local-skill-dir>`
+5. rebuild the registry
+6. optionally update a profile with `profile update --add-skill`
+7. optionally run `sync`
+
+If the repository uses a non-default branch, tag, commit, or a custom skill path, supply an explicit git ref and source subpath.
+This is especially important when a GitHub tree URL uses a branch name containing `/`, such as `feature/demo`.
+
+Manual CLI example:
+
+```bash
+./bin/skill-hub skill import --root ~/.skill-hub --source /path/to/skill-dir
+./bin/skill-hub registry build --root ~/.skill-hub
+./bin/skill-hub skill source list --root ~/.skill-hub
+./bin/skill-hub skill source show --root ~/.skill-hub --name web-access --json
+```
+
+`skill-hub skill import` itself accepts a local skill directory only.
+Remote repository URL handling lives in `skills/skill-installer/scripts/install_skill.py`.
 
 ## Manual CLI Example
 
@@ -78,7 +104,7 @@ When an agent handles installation, it should follow the same detection order an
 2. Detect an installed `skill-hub` command on PATH.
 3. If neither exists, ask before cloning the public repository.
 4. If an existing checkout needs an update, ask before touching it.
-5. If a sync is needed, ask before writing to the target directory.
+5. Before initializing or repairing the local workspace, ask for confirmation of the workspace root.
 ```
 
 The agent installs the public manager, not private skills.

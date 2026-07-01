@@ -1,0 +1,4 @@
+interface:
+  display_name: "Self Installer"
+  short_description: "Install skill-hub-manager from a repo URL onto the current machine."
+  default_prompt: "Install or update skill-hub-manager from the given repository URL. Confirm the checkout path and workspace root with me before any clone, pull, or workspace initialization, then finish setup and show the next validation commands."

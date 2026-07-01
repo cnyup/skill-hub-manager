@@ -13,6 +13,7 @@ from skill_hub_manager.install_state import (
     upsert_install_record,
     write_install_records,
 )
+from skill_hub_manager.importer import import_skill_directory
 from skill_hub_manager.paths import (
     initialize_workspace,
     install_state_file,
@@ -40,6 +41,12 @@ from skill_hub_manager.registry import (
     write_registry,
 )
 from skill_hub_manager.skills import scan_skills
+from skill_hub_manager.source_state import (
+    find_source_record,
+    load_source_records,
+    upsert_source_record,
+    write_source_records,
+)
 from skill_hub_manager.sync import render_sync_result_json, sync_profile, write_sync_state
 
 
@@ -120,6 +127,34 @@ def build_parser() -> argparse.ArgumentParser:
     install_state_record.add_argument("--manager-revision", required=True)
     install_state_record.add_argument("--detection-confidence", required=True)
     install_state_record.add_argument("--detection-reason", required=True)
+
+    skill = subparsers.add_parser("skill")
+    skill_subparsers = skill.add_subparsers(dest="skill_command")
+
+    skill_import = skill_subparsers.add_parser("import")
+    skill_import.add_argument("--root", required=True)
+    skill_import.add_argument("--source", required=True)
+    skill_import.add_argument("--name")
+    skill_import.add_argument("--force", action="store_true")
+    skill_import.add_argument("--source-ref")
+    skill_import.add_argument("--source-type")
+    skill_import.add_argument("--repo-url")
+    skill_import.add_argument("--git-ref")
+    skill_import.add_argument("--cache-checkout")
+    skill_import.add_argument("--import-subpath")
+    skill_import.add_argument("--json", action="store_true")
+
+    skill_source = skill_subparsers.add_parser("source")
+    skill_source_subparsers = skill_source.add_subparsers(dest="skill_source_command")
+
+    skill_source_list = skill_source_subparsers.add_parser("list")
+    skill_source_list.add_argument("--root", required=True)
+    skill_source_list.add_argument("--json", action="store_true")
+
+    skill_source_show = skill_source_subparsers.add_parser("show")
+    skill_source_show.add_argument("--root", required=True)
+    skill_source_show.add_argument("--name", required=True)
+    skill_source_show.add_argument("--json", action="store_true")
 
     profile = subparsers.add_parser("profile")
     profile_subparsers = profile.add_subparsers(dest="profile_command")
@@ -343,6 +378,116 @@ def main(argv: list[str] | None = None) -> int:
         }
         write_install_records(state_file, upsert_install_record(records, record))
         print(f"recorded: {state_file}")
+        return 0
+    if args.command == "skill" and args.skill_command == "import":
+        paths = initialize_workspace(resolve_workspace_root(_optional_path(args.root)))
+        source = Path(args.source)
+        try:
+            result = import_skill_directory(
+                source=source,
+                destination_root=paths.skills,
+                skill_name=args.name,
+                overwrite=args.force,
+            )
+        except ValueError as error:
+            if args.json:
+                print(
+                    json.dumps(
+                        {
+                            "skill": args.name or Path(args.source).name,
+                            "source": str(source),
+                            "target": str(paths.skills / (args.name or Path(args.source).name)),
+                            "replaced": False,
+                            "state_file": str(paths.state / "skill-sources.json"),
+                            "error": str(error),
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                print(str(error))
+            return 1
+        except FileExistsError as error:
+            if args.json:
+                print(
+                    json.dumps(
+                        {
+                            "skill": args.name or Path(args.source).name,
+                            "source": str(source),
+                            "target": str(error.args[0]),
+                            "replaced": False,
+                            "state_file": str(paths.state / "skill-sources.json"),
+                            "error": f"exists: {error.args[0]}",
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                print(f"exists: {error.args[0]}")
+            return 1
+        source_state_path = paths.state / "skill-sources.json"
+        records = load_source_records(source_state_path)
+        record = {
+            "skill": result.skill,
+            "source": args.source_ref or str(result.source),
+            "stored_path": str(result.target),
+            "imported_at": _utc_now(),
+        }
+        if args.source_type:
+            record["source_type"] = args.source_type
+        if args.repo_url:
+            record["repo_url"] = args.repo_url
+        if args.git_ref:
+            record["git_ref"] = args.git_ref
+        if args.cache_checkout:
+            record["cache_checkout"] = args.cache_checkout
+        if args.import_subpath:
+            record["import_subpath"] = args.import_subpath
+        write_source_records(source_state_path, upsert_source_record(records, record))
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "skill": result.skill,
+                        "source": str(result.source),
+                        "target": str(result.target),
+                        "replaced": result.replaced,
+                        "state_file": str(source_state_path),
+                    },
+                    indent=2,
+                )
+            )
+            return 0
+        print(f"imported: {result.skill}")
+        print(f"source: {result.source}")
+        print(f"target: {result.target}")
+        print(f"replaced: {'yes' if result.replaced else 'no'}")
+        print(f"recorded: {source_state_path}")
+        return 0
+    if args.command == "skill" and args.skill_command == "source" and args.skill_source_command == "list":
+        paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
+        records = load_source_records(paths.state / "skill-sources.json")
+        if args.json:
+            print(json.dumps({"records": records}, indent=2))
+            return 0
+        for record in records:
+            print(record.get("skill", ""))
+        return 0
+    if args.command == "skill" and args.skill_command == "source" and args.skill_source_command == "show":
+        paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
+        records = load_source_records(paths.state / "skill-sources.json")
+        record = find_source_record(records, args.name)
+        if record is None:
+            if args.json:
+                print(json.dumps({"record": None}, indent=2))
+            else:
+                print(f"missing: {args.name}")
+            return 1
+        if args.json:
+            print(json.dumps({"record": record}, indent=2))
+            return 0
+        for key, value in record.items():
+            print(f"{key}: {value}")
         return 0
     if args.command == "profile" and args.profile_command == "list":
         paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))

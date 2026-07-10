@@ -1,9 +1,12 @@
 ---
 name: self-installer
-description: Use when a user wants skill-hub-manager itself installed or updated from a Git repository on the current machine, especially on a fresh machine or when the local checkout or workspace must be created or repaired.
+description: "[Deprecated] Use when a user wants skill-hub-manager itself installed or updated from a Git repository on the current machine. For new users, prefer giving the agent the GitHub URL directly — see Quick Start in README.md. This skill is kept for legacy compatibility only."
+deprecated: true
 ---
 
-# Self Installer
+# Self Installer (Deprecated)
+
+> **This skill is deprecated.** For installing skill-hub-manager, give the agent the GitHub URL directly instead of using this skill. See the README Quick Start section.
 
 ## Overview
 

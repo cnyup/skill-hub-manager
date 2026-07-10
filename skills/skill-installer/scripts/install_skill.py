@@ -6,12 +6,32 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
 
 DEFAULT_WORKSPACE_ROOT = Path.home() / ".skill-hub"
+
+MIN_PYTHON = (3, 11)
+
+
+def preflight_checks() -> None:
+    """Fail fast with a clear message if the environment is not ready."""
+    if sys.version_info < MIN_PYTHON:
+        raise SystemExit(
+            f"Python {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+ required, "
+            f"got {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}. "
+            f"Install a newer Python from https://www.python.org/downloads/"
+        )
+    if not shutil.which("git"):
+        raise SystemExit(
+            "git not found on PATH. Install git first:\n"
+            "  macOS:  xcode-select --install\n"
+            "  Ubuntu: sudo apt install git\n"
+            "  Fedora: sudo dnf install git"
+        )
 
 
 @dataclass(frozen=True)
@@ -293,6 +313,7 @@ def ensure_profile(manager_cli: list[str], workspace_root: Path, profile: str, a
 
 
 def main(argv: list[str] | None = None) -> int:
+    preflight_checks()
     args = build_parser().parse_args(argv)
     workspace_root = Path(args.workspace_root).expanduser()
     resolved = parse_source(
@@ -344,6 +365,7 @@ def main(argv: list[str] | None = None) -> int:
         update_source=args.update_source,
     )
     manager_cli = cli_command(args.manager_cli)
+    force_import = args.force or args.update_source
     run([*manager_cli, "init", "--root", str(workspace_root)])
     run(
         [
@@ -355,7 +377,7 @@ def main(argv: list[str] | None = None) -> int:
             "--source",
             str(import_source),
             *(["--name", args.name] if args.name else []),
-            *(["--force"] if args.force else []),
+            *(["--force"] if force_import else []),
             *(["--source-ref", args.source] if args.source else []),
             *(["--source-type", resolved.mode] if resolved.mode else []),
             *(["--repo-url", resolved.repo_url] if resolved.repo_url else []),

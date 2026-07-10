@@ -2,13 +2,34 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 
 DEFAULT_REPO_URL = "https://github.com/cnyup/skill-hub-manager.git"
 DEFAULT_CHECKOUT_DIR = Path.home() / "skill-hub-manager"
 DEFAULT_WORKSPACE_ROOT = Path.home() / ".skill-hub"
+
+MIN_PYTHON = (3, 11)
+
+
+def preflight_checks() -> None:
+    """Fail fast with a clear message if the environment is not ready."""
+    if sys.version_info < MIN_PYTHON:
+        raise SystemExit(
+            f"Python {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+ required, "
+            f"got {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}. "
+            f"Install a newer Python from https://www.python.org/downloads/"
+        )
+    if not shutil.which("git"):
+        raise SystemExit(
+            "git not found on PATH. Install git first:\n"
+            "  macOS:  xcode-select --install\n"
+            "  Ubuntu: sudo apt install git\n"
+            "  Fedora: sudo dnf install git"
+        )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -115,6 +136,7 @@ def install_manager(
 
 
 def main(argv: list[str] | None = None) -> int:
+    preflight_checks()
     args = build_parser().parse_args(argv)
     checkout_dir = Path(args.checkout_dir).expanduser()
     workspace_root = Path(args.workspace_root).expanduser()

@@ -46,6 +46,7 @@ For GitHub tree URLs whose branch names contain `/`, require an explicit git ref
 - If the source uses a non-default branch, tag, commit, or nested skill path, prefer an explicit git ref and source subpath instead of guessing.
 - If the user does not explicitly ask for profile changes or sync, stop after import and registry rebuild.
 - If install fails, report the exact failing command or path.
+- When `--update-source` is set, the import automatically uses `--force` to overwrite the existing skill in the vault. This is intentional — the user explicitly asked for an update.
 
 ## Script
 

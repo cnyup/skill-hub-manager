@@ -41,3 +41,8 @@ def find_source_record(records: list[dict[str, str]], skill: str) -> dict[str, s
         if record.get("skill") == skill:
             return record
     return None
+
+
+def remove_source_record(records: list[dict[str, str]], skill: str) -> list[dict[str, str]]:
+    """Remove the source record matching the given skill name."""
+    return [dict(record) for record in records if record.get("skill") != skill]

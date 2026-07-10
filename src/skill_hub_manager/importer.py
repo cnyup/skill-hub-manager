@@ -13,6 +13,13 @@ class ImportResult:
     replaced: bool
 
 
+@dataclass(frozen=True)
+class RemoveResult:
+    skill: str
+    target: Path
+    removed: bool
+
+
 def import_skill_directory(
     source: Path,
     destination_root: Path,
@@ -39,3 +46,26 @@ def import_skill_directory(
         shutil.rmtree(target_dir)
     shutil.copytree(source_dir, target_dir)
     return ImportResult(skill=skill, source=source_dir, target=target_dir, replaced=replaced)
+
+
+def remove_skill_directory(
+    vault: Path,
+    skill_name: str,
+) -> RemoveResult:
+    """Remove a skill directory from the vault.
+
+    Returns RemoveResult with removed=False if the skill did not exist.
+    Raises ValueError if the vault path is not a directory.
+    """
+    if not vault.is_dir():
+        raise ValueError(f"vault is not a directory: {vault}")
+
+    target_dir = vault / skill_name
+    if not target_dir.exists():
+        return RemoveResult(skill=skill_name, target=target_dir, removed=False)
+
+    if not target_dir.is_dir():
+        raise ValueError(f"skill path is not a directory: {target_dir}")
+
+    shutil.rmtree(target_dir)
+    return RemoveResult(skill=skill_name, target=target_dir, removed=True)

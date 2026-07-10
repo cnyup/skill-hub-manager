@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Local-first skills manager for multi-agent workflows"
 requires-python = ">=3.11"
 dependencies = []
+license = "Apache-2.0"
 
 [project.scripts]
 skill-hub = "skill_hub_manager.cli:entrypoint"

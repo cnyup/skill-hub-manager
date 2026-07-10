@@ -4,6 +4,25 @@
 
 This project currently supports two practical ways to run `skill-hub`.
 
+## Prerequisites
+
+Before installing, ensure you have:
+
+- **Python 3.11+** — check with `python3 --version`
+- **Git** — required for cloning the manager and any remote skills — check with `git --version`
+- **macOS or Linux** — Windows is not yet tested (symlink support requires special configuration)
+- Optional: **pip + setuptools** — only needed if you want `skill-hub` on your shell `PATH` instead of using the bundled `./bin/skill-hub` wrapper
+
+If any of these are missing, install them first:
+
+```bash
+# Python (via your preferred method, e.g. pyenv, homebrew, apt)
+python3 --version    # must be >= 3.11
+
+# Git
+git --version        # macOS ships git with Xcode Command Line Tools
+```
+
 ## Skill-Based Flow
 
 This is the agent-first flow. The user should only need to talk to an agent.
@@ -157,20 +176,18 @@ Use this path when:
 - you are using a normal online Python environment
 - you want shell aliases or automation to call the installed command directly
 
-## Current Limitation
+## Notes on Installation Methods
 
-In the current restricted environment used during development verification here, `pip install -e .` could not be fully verified because:
+Both installation methods are fully supported:
 
-- the Python 3.14 virtual environment did not include `setuptools`
-- build isolation attempted to download packaging dependencies from PyPI
-- outbound package index access was unavailable
+- **`./bin/skill-hub`** (checkout wrapper) is the simplest path — no packaging tools needed. It sets `PYTHONPATH=src` and runs the CLI directly. Use this when working from a Git checkout, in restricted environments, or for local development.
+- **`pip install -e .`** (editable install) puts `skill-hub` on your shell `PATH` via a console script declared in `pyproject.toml`. Use this on a normal workstation where you want the command available globally.
 
-That affects installation verification in this environment, not the CLI runtime itself.
+If `pip install -e .` fails, the most common causes are:
+- Missing `setuptools` in your Python environment — fix with `python3 -m pip install setuptools`
+- Build isolation unable to reach PyPI — try `pip install -e . --no-build-isolation`
 
-In other words:
-
-- `./bin/skill-hub` is the verified path in the current repository environment
-- `pip install -e .` is the standard distribution path for normal Python workstations
+The checkout wrapper always works regardless of packaging tool availability.
 
 ## Recommended Local Workflow
 

@@ -4,6 +4,27 @@
 
 当前项目支持两种实际可用的 `skill-hub` 运行方式。
 
+## 前置条件
+
+安装前请确认你具备以下条件：
+
+| 条件 | 验证 | 说明 |
+|---|---|---|
+| **Python 3.11+** | `python3 --version` | CLI 和安装脚本必需 |
+| **Git** | `git --version` | 克隆管理器和远程 skill 必需 |
+| **macOS 或 Linux** | — | Windows 尚未测试（symlink 需要特殊配置） |
+| **pip + setuptools**（可选） | `python3 -m pip --version` | 仅在需要把 `skill-hub` 放到 PATH 时需要 |
+
+如果缺少任何一项，请先安装：
+
+```bash
+# Python（通过你偏好的方式安装，例如 pyenv、homebrew、apt）
+python3 --version    # 必须 >= 3.11
+
+# Git
+git --version        # macOS 通过 Xcode Command Line Tools 自带
+```
+
 ## 基于 Skill 的安装流程
 
 这是面向 agent 的流程。用户只需要和 agent 对话。
@@ -174,20 +195,18 @@ skill-hub --version
 - 你使用的是正常联网的 Python 环境
 - 你希望 alias、脚本或自动化直接调用安装后的命令
 
-## 当前限制
+## 安装方式说明
 
-在这次开发验证所处的受限环境中，`pip install -e .` 没能被完整验证，原因是：
+两种安装方式都完全可用：
 
-- Python 3.14 的虚拟环境里没有自带 `setuptools`
-- build isolation 会尝试从 PyPI 下载构建依赖
-- 当前环境没有可用的外网包索引访问能力
+- **`./bin/skill-hub`**（checkout wrapper）是最简单的路径 — 不需要打包工具。它设置 `PYTHONPATH=src` 后直接运行 CLI。适合从 Git checkout 工作、受限环境、或本地开发。
+- **`pip install -e .`**（editable install）通过 `pyproject.toml` 声明的 console script 把 `skill-hub` 放到 shell `PATH`。适合正常工作站上希望命令全局可用的场景。
 
-这影响的是“安装验证”，不是 CLI 本身的运行逻辑。
+如果 `pip install -e .` 失败，最常见的原因是：
+- Python 环境缺少 `setuptools` — 用 `python3 -m pip install setuptools` 修复
+- build isolation 无法访问 PyPI — 尝试 `pip install -e . --no-build-isolation`
 
-换句话说：
-
-- `./bin/skill-hub` 是当前仓库环境里已经验证通过的路径
-- `pip install -e .` 是面向正常 Python 工作站的标准分发路径
+checkout wrapper 无论打包工具是否可用都能正常工作。
 
 ## 推荐本地工作流
 

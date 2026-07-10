@@ -121,6 +121,98 @@ Notes:
 - `skills` is ordered the same way as the loaded registry entries
 - optional fields may be absent if not present in `registry.yaml`
 
+## `scan --json`
+
+Command:
+
+```bash
+skill-hub scan --root <path> --json
+```
+
+Shape:
+
+```json
+{
+  "skills": ["k8s-finder", "billing-labeler"]
+}
+```
+
+Notes:
+
+- `skills` is sorted alphabetically
+- Unlike `ls --json`, this scans the vault directly (not the registry) and returns names only
+
+## `skill remove --json`
+
+Command:
+
+```bash
+skill-hub skill remove --root <path> --name <skill> [--purge-source] --json
+```
+
+Shape (success):
+
+```json
+{
+  "skill": "web-access",
+  "target": "/path/to/workspace/skills/web-access",
+  "removed": true,
+  "purged_source": true,
+  "updated_profiles": ["default", "codex"]
+}
+```
+
+Shape (skill not found):
+
+```json
+{
+  "skill": "nonexistent",
+  "target": "/path/to/workspace/skills/nonexistent",
+  "removed": false
+}
+```
+
+Notes:
+
+- `removed` is `false` if the skill did not exist in the vault
+- `purged_source` reflects whether `--purge-source` was passed
+- `updated_profiles` lists profiles that contained the skill and were modified
+- The registry is always rebuilt after a successful removal
+
+## `skill update --json`
+
+Command:
+
+```bash
+skill-hub skill update --root <path> --name <skill> --json
+```
+
+Shape (success):
+
+```json
+{
+  "skill": "web-access",
+  "source": "/path/to/cached/source",
+  "target": "/path/to/workspace/skills/web-access",
+  "replaced": true
+}
+```
+
+Shape (no source record):
+
+```json
+{
+  "skill": "nonexistent",
+  "updated": false,
+  "error": "no source record"
+}
+```
+
+Notes:
+
+- `replaced` is always `true` for a successful update (the skill already existed)
+- Requires a source record with `cache_checkout` or `source` path
+
 ## `audit --json`
 
 Command:

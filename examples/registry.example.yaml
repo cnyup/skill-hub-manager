@@ -1,6 +1,6 @@
 skills:
   k8s-finder:
-    path: /Users/yup/.skill-hub/skills/k8s-finder
+    path: ~/.skill-hub/skills/k8s-finder
     visibility: private
     description: Find Kubernetes services from IPs and ownership clues
     agents: [codex, claude]

@@ -57,12 +57,12 @@ It does not contain private skills.
 
 The private vault is a local directory outside the repository, for example:
 
-- `/Users/yup/.skill-hub/skills`
+- `~/.skill-hub/skills`
 
 Each skill is stored once in the vault:
 
-- `/Users/yup/.skill-hub/skills/billing-labeler/SKILL.md`
-- `/Users/yup/.skill-hub/skills/k8s-finder/SKILL.md`
+- `~/.skill-hub/skills/billing-labeler/SKILL.md`
+- `~/.skill-hub/skills/k8s-finder/SKILL.md`
 
 The vault is the only source of truth for actual skill content.
 
@@ -142,7 +142,7 @@ skill-hub-manager/
 ```yaml
 skills:
   k8s-finder:
-    path: /Users/yup/.skill-hub/skills/k8s-finder
+    path: ~/.skill-hub/skills/k8s-finder
     tags: [infra, kubernetes]
     visibility: private
     agents: [codex, claude]

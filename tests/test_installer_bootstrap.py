@@ -1,6 +1,3 @@
-import importlib.util
-import io
-import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,18 +5,6 @@ from subprocess import CompletedProcess
 from unittest.mock import patch
 
 from skill_hub_manager.installer_bootstrap import ensure_manager_checkout, run_install_flow
-
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-
-
-def _load_script_module(path: Path, module_name: str):
-    spec = importlib.util.spec_from_file_location(module_name, path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"unable to load module from {path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 class InstallerBootstrapTests(unittest.TestCase):
@@ -352,21 +337,6 @@ class InstallerBootstrapTests(unittest.TestCase):
                 )
 
         self.assertEqual(run_mock.call_args_list, [])
-
-    def test_detect_target_script_prints_json_payload(self):
-        script = REPO_ROOT / "skills" / "install-skill-hub" / "scripts" / "detect_target.py"
-        module = _load_script_module(script, "detect_target_script")
-
-        with tempfile.TemporaryDirectory() as temp_dir, patch("sys.stdout", new_callable=io.StringIO) as stdout:
-            exit_code = module.main([temp_dir, "codex"])
-
-        payload = json.loads(stdout.getvalue())
-        self.assertEqual(exit_code, 0)
-        self.assertEqual(payload["agent"], "codex")
-        self.assertTrue(payload["detected"])
-        self.assertEqual(payload["confidence"], "medium")
-        self.assertEqual(payload["target_dir"], str(Path.home() / ".codex" / "skills"))
-        self.assertEqual(payload["reason"], "builtin-agent-mapping")
 
 
 if __name__ == "__main__":

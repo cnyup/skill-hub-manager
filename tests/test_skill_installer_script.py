@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 
-SCRIPT_PATH = Path("/Users/yup/skill-hub-manager/skills/skill-installer/scripts/install_skill.py")
+SCRIPT_PATH = Path(__file__).resolve().parents[1] / "skills" / "skill-installer" / "scripts" / "install_skill.py"
 
 
 def load_script_module():

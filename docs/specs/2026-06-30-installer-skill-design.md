@@ -66,7 +66,7 @@ Suggested output shape:
   "agent": "codex",
   "detected": true,
   "confidence": "high",
-  "target_dir": "/Users/yup/.codex/skills",
+  "target_dir": "~/.codex/skills",
   "reason": "known directory mapping"
 }
 ```

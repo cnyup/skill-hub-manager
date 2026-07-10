@@ -19,7 +19,7 @@ The private vault stores the real skills once.
 
 Example:
 
-- `/Users/yup/.skill-hub/skills/k8s-finder/SKILL.md`
+- `~/.skill-hub/skills/k8s-finder/SKILL.md`
 
 ### Registry
 

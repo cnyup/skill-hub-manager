@@ -24,6 +24,7 @@ For GitHub tree URLs whose branch names contain `/`, require an explicit git ref
    - optional explicit source subpath inside a repository
    - optional profile name
    - optional sync target directory
+   - requested agent and whether its scope is global or project-only
 3. Before any write action, show the exact plan and ask the user to confirm:
    - source URL or local path
    - clone or update path if the source is remote
@@ -45,6 +46,8 @@ For GitHub tree URLs whose branch names contain `/`, require an explicit git ref
 - If the source is remote and already cached locally, ask whether it should be updated first.
 - If the source uses a non-default branch, tag, commit, or nested skill path, prefer an explicit git ref and source subpath instead of guessing.
 - If the user does not explicitly ask for profile changes or sync, stop after import and registry rebuild.
+- For OpenCode, use `~/.config/opencode/skills/` only when the user explicitly requests global availability. For a project-only install, require the project directory and sync to `<project>/.opencode/skills/`.
+- After syncing to an OpenCode target, tell the user to quit and restart OpenCode because skills are loaded at startup.
 - If install fails, report the exact failing command or path.
 - When `--update-source` is set, the import automatically uses `--force` to overwrite the existing skill in the vault. This is intentional — the user explicitly asked for an update.
 

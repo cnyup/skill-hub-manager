@@ -33,7 +33,7 @@ Before installing, ensure you have:
 ## Why Use It
 
 1. **One source of truth** — Keep a single real copy of each skill instead of duplicating across agents and projects.
-2. **Per-agent access control** — Give Codex one subset, Claude Code another, via profiles.
+2. **Per-agent access control** — Give Codex, Claude Code, or OpenCode separate subsets via profiles.
 3. **Local + remote** — Import skills from local directories or remote Git repos.
 4. **Agent-driven** — Operate the entire manager through conversation, not terminal commands.
 
@@ -138,6 +138,10 @@ Default targets:
 - **Claude Code**: `~/.claude/skills/`
 - **Cursor**: `~/.cursor/skills/`
 - **Windsurf**: `~/.codeium/windsurf/skills/`
+- **OpenCode global**: `~/.config/opencode/skills/`
+- **OpenCode project-only**: `<project>/.opencode/skills/`
+
+Use OpenCode's global target only when the skill should be available in every OpenCode project. For a project-only install, provide the project path and sync to its `.opencode/skills/` directory.
 
 ### Step 3: Install a business skill
 
@@ -163,6 +167,20 @@ Add web-access to my claude-code profile and sync to ~/.claude/skills/
 
 You only need to tell the agent: where the skills come from, which agent should receive them, and whether to show a plan first.
 
+For a project-scoped OpenCode install, use this prompt:
+
+```text
+Install this skill into my skill-hub workspace and expose it only to this OpenCode project:
+https://github.com/example-org/example-repo/tree/main/skills/web-access
+
+Project directory: /path/to/project
+Profile name: opencode-project
+Sync target: /path/to/project/.opencode/skills
+Show the complete plan and ask for confirmation before any clone, update, profile change, or sync.
+```
+
+Restart OpenCode after syncing because it loads skills at startup.
+
 ### CLI Fallback
 
 If you are not using an agent, use the CLI directly:
@@ -175,6 +193,8 @@ If you are not using an agent, use the CLI directly:
 ```
 
 For remote skill sources, let `skills/skill-installer/scripts/install_skill.py` resolve and cache first, then import the local directory.
+
+Sync only removes stale links that point into the current vault. Existing regular files, directories, and external symlinks are preserved; a same-name target is reported as a conflict instead of being overwritten.
 
 ## Advanced Workflows
 

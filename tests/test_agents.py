@@ -46,6 +46,33 @@ class AgentDetectionTests(unittest.TestCase):
         self.assertIsNone(result.target_dir)
         self.assertEqual(result.reason, "no-known-agent-target")
 
+    def test_opencode_uses_its_global_skills_directory(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = detect_agent_target(root=Path(temp_dir), agent_hint="opencode")
+
+        self.assertEqual(result.agent, "opencode")
+        self.assertTrue(result.detected)
+        self.assertEqual(result.confidence, "medium")
+        self.assertEqual(result.target_dir, Path.home() / ".config" / "opencode" / "skills")
+        self.assertEqual(result.reason, "builtin-agent-mapping")
+
+    def test_multiple_records_for_one_agent_require_manual_target_selection(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            write_install_records(
+                install_state_file(root),
+                [
+                    {"agent": "opencode", "profile": "project-a", "target_dir": "/tmp/a"},
+                    {"agent": "opencode", "profile": "project-b", "target_dir": "/tmp/b"},
+                ],
+            )
+
+            result = detect_agent_target(root=root, agent_hint="opencode")
+
+        self.assertFalse(result.detected)
+        self.assertIsNone(result.target_dir)
+        self.assertEqual(result.reason, "ambiguous-install-record")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,8 +1,15 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
-from skill_hub_manager.registry import build_registry, doctor_registry, render_registry_doctor_json, write_registry
+from skill_hub_manager.registry import (
+    build_registry,
+    doctor_registry,
+    load_registry_entries,
+    render_registry_doctor_json,
+    write_registry,
+)
 
 
 class RegistryTests(unittest.TestCase):
@@ -35,10 +42,10 @@ class RegistryTests(unittest.TestCase):
             self.assertIn("skills:", content)
             self.assertIn("k8s-finder:", content)
             self.assertIn(str(skill), content)
-            self.assertIn("description: Find Kubernetes services", content)
-            self.assertIn("visibility: team", content)
-            self.assertIn("agents: [codex, claude]", content)
-            self.assertIn("tags: [infra, kubernetes]", content)
+            self.assertIn('description: "Find Kubernetes services"', content)
+            self.assertIn('visibility: "team"', content)
+            self.assertIn('agents: ["codex", "claude"]', content)
+            self.assertIn('tags: ["infra", "kubernetes"]', content)
 
     def test_build_registry_sorts_skills_and_omits_empty_optional_fields(self):
         with tempfile.TemporaryDirectory() as temp_dir:

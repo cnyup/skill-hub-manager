@@ -80,6 +80,30 @@ class SkillInstallerScriptTests(unittest.TestCase):
             resolved.checkout_root / "custom/skill-dir",
         )
 
+    def test_parse_source_accepts_file_git_url_without_git_suffix(self):
+        module = load_script_module()
+
+        resolved = module.parse_source(
+            "file:///tmp/example-repository",
+            Path("/tmp/workspace"),
+            "web-access",
+        )
+
+        self.assertEqual(resolved.mode, "git-repo")
+        self.assertEqual(resolved.repo_url, "file:///tmp/example-repository")
+        self.assertEqual(resolved.import_source, resolved.checkout_root / "skills" / "web-access")
+
+    def test_parse_source_rejects_parent_directory_subpath(self):
+        module = load_script_module()
+
+        with self.assertRaisesRegex(ValueError, "source subpath"):
+            module.parse_source(
+                "file:///tmp/example.git",
+                Path("/tmp/workspace"),
+                None,
+                source_subpath="../outside",
+            )
+
     def test_detect_single_skill_root_accepts_repo_root_skill(self):
         module = load_script_module()
         with tempfile.TemporaryDirectory() as temp_dir:

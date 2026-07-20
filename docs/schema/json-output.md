@@ -21,16 +21,18 @@ Shape:
   "target": "/path/to/target",
   "linked": ["k8s-finder"],
   "missing": [],
-  "removed": []
+  "removed": [],
+  "conflicts": []
 }
 ```
 
 Notes:
 
 - `mode` is `apply` or `dry-run`
-- `linked` is the final desired linked skill set processed in this run
+- `linked` contains skills linked successfully or already linked to the same vault source
 - `missing` contains requested skills not found in the vault
-- `removed` contains stale symlink names removed or planned for removal
+- `removed` contains stale symlink names removed or planned for removal. Only links pointing into the current vault are managed.
+- `conflicts` contains requested skill names whose target entry is a regular file, directory, or external symlink. Sync leaves these entries unchanged and returns a non-zero exit status.
 
 ## `profile validate --json`
 

@@ -88,7 +88,7 @@ class ProfileTests(unittest.TestCase):
                 profiles_dir,
                 load_profile(
                     _write_fixture(
-                        profiles_dir / "input.yaml",
+                        profiles_dir / "fixture" / "default.yaml",
                         "name: default\n"
                         "agent: codex\n"
                         "skills:\n"
@@ -122,6 +122,30 @@ class ProfileTests(unittest.TestCase):
                     profiles_dir,
                     Profile(name="default", agent="codex", skills=["k8s-finder"]),
                 )
+
+    def test_write_profile_rejects_path_traversal_name(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaisesRegex(ValueError, "invalid profile name"):
+                write_profile(
+                    Path(temp_dir),
+                    Profile(name="../outside", agent="codex", skills=["k8s-finder"]),
+                )
+
+    def test_load_profile_rejects_path_traversal_skill_name(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "default.yaml"
+            path.write_text("name: default\nagent: codex\nskills:\n  - ../outside\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "invalid skill name"):
+                load_profile(path)
+
+    def test_load_profile_rejects_file_name_mismatch(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "default.yaml"
+            path.write_text("name: other\nagent: codex\nskills:\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "does not match"):
+                load_profile(path)
 
     def test_remove_profile_deletes_existing_profile_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -283,5 +307,6 @@ class ProfileTests(unittest.TestCase):
 
 
 def _write_fixture(path: Path, content: str) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
     return path

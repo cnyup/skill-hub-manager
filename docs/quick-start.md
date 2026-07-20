@@ -246,6 +246,8 @@ PYTHONPATH=src python3 -m skill_hub_manager.cli sync --root ~/.skill-hub \
 
 All current JSON output shapes are documented in `docs/schema/json-output.md`.
 
+For OpenCode, use `~/.config/opencode/skills/` for a global profile, or `<project>/.opencode/skills/` for a profile limited to one project. Restart OpenCode after syncing because it loads skills at startup.
+
 This also writes `~/.skill-hub/state/last-sync.json` so later checks can detect drift from the last successful sync.
 
 During sync, stale symlink entries in the target that are no longer part of the current profile are removed automatically. Regular files in the target are not modified.

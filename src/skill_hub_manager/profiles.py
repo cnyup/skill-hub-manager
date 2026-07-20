@@ -3,6 +3,9 @@ from fnmatch import fnmatch
 import json
 from pathlib import Path
 
+from skill_hub_manager.state_io import atomic_write_text
+from skill_hub_manager.validation import validate_identifier
+
 
 @dataclass(frozen=True)
 class Profile:
@@ -21,12 +24,19 @@ class Profile:
 
 def load_profile(path: Path) -> Profile:
     data = _parse_simple_profile_yaml(path.read_text(encoding="utf-8"))
-    return Profile(
+    profile = Profile(
         name=data["name"],
         agent=data["agent"],
         skills=data.get("skills", []),
         exclude=data.get("exclude", []),
     )
+    if profile.name != path.stem:
+        raise ValueError(f"profile name does not match file name: {path}")
+    validate_identifier(profile.name, "profile name")
+    validate_identifier(profile.agent, "agent name")
+    for skill in profile.skills:
+        validate_identifier(skill, "skill name")
+    return profile
 
 
 def list_profiles(profiles_dir: Path) -> list[Path]:
@@ -36,12 +46,15 @@ def list_profiles(profiles_dir: Path) -> list[Path]:
 
 
 def write_profile(profiles_dir: Path, profile: Profile, overwrite: bool = False) -> Path:
+    validate_identifier(profile.name, "profile name")
+    validate_identifier(profile.agent, "agent name")
+    for skill in profile.skills:
+        validate_identifier(skill, "skill name")
     profiles_dir.mkdir(parents=True, exist_ok=True)
     path = profile_path(profiles_dir, profile.name)
     if path.exists() and not overwrite:
         raise FileExistsError(path)
-    path.write_text(_render_profile(profile), encoding="utf-8")
-    return path
+    return atomic_write_text(path, _render_profile(profile))
 
 
 def remove_profile(profiles_dir: Path, name: str) -> bool:
@@ -53,6 +66,7 @@ def remove_profile(profiles_dir: Path, name: str) -> bool:
 
 
 def profile_path(profiles_dir: Path, name: str) -> Path:
+    validate_identifier(name, "profile name")
     return profiles_dir / f"{name}.yaml"
 
 

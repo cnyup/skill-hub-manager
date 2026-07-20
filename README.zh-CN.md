@@ -33,7 +33,7 @@
 ## 为什么要用
 
 1. **只保留一份** — 真实 skills 始终只存一份，不再为多个 agent、多个项目复制副本。
-2. **按 agent 分配权限** — 只给 Codex 一部分 skill，只给 Claude Code 另一部分，通过 profile 控制。
+2. **按 agent 分配权限** — 通过 profile 分别控制 Codex、Claude Code 或 OpenCode 可见的 skill。
 3. **本地 + 远程** — 从本地目录或远程 Git 仓库导入 skill。
 4. **Agent 驱动** — 全程通过和 AI 对话完成，不需要长期手敲终端命令。
 
@@ -138,6 +138,10 @@ skill-hub --version
 - **Claude Code**：`~/.claude/skills/`
 - **Cursor**：`~/.cursor/skills/`
 - **Windsurf**：`~/.codeium/windsurf/skills/`
+- **OpenCode 全局**：`~/.config/opencode/skills/`
+- **OpenCode 项目隔离**：`<project>/.opencode/skills/`
+
+只有希望所有 OpenCode 项目都能使用时，才使用全局目标。项目隔离安装时，需要提供项目路径并同步到该项目的 `.opencode/skills/` 目录。
 
 ### 第三步：安装业务 skill
 
@@ -162,6 +166,20 @@ agent 负责解析来源、导入到 `~/.skill-hub/skills/`、重建 registry，
 
 你只需要告诉 agent：skill 来源在哪、想给哪个 agent 用、是否要先展示计划。
 
+如果只想给一个 OpenCode 项目安装，请使用：
+
+```text
+帮我把这个 skill 安装到 skill-hub workspace，并且只暴露给当前 OpenCode 项目：
+https://github.com/example-org/example-repo/tree/main/skills/web-access
+
+项目目录：/path/to/project
+Profile 名称：opencode-project
+Sync 目标：/path/to/project/.opencode/skills
+在任何 clone、update、profile 修改或 sync 前，先展示完整计划并征求确认。
+```
+
+同步完成后重启 OpenCode，因为它在启动时加载 skills。
+
 ### CLI 兜底路径
 
 如果不走 agent，直接用 CLI：
@@ -174,6 +192,8 @@ agent 负责解析来源、导入到 `~/.skill-hub/skills/`、重建 registry，
 ```
 
 如果 skill 来源是远程仓库 URL，先让 `skills/skill-installer/scripts/install_skill.py` 完成解析和缓存，再导入本地目录。
+
+sync 只会删除指向当前 vault 的陈旧链接。已有普通文件、目录和外部 symlink 会保留；同名目标会报告 conflict，而不会被覆盖。
 
 ## 进阶用法
 

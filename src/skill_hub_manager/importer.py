@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import shutil
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+
+from skill_hub_manager.validation import validate_identifier
 
 
 @dataclass(frozen=True)
@@ -34,17 +37,31 @@ def import_skill_directory(
         raise ValueError(f"missing SKILL.md in source directory: {source_dir}")
 
     skill = skill_name or source_dir.name
-    if not skill:
-        raise ValueError("skill name cannot be empty")
+    validate_identifier(skill, "skill name")
 
     destination_root.mkdir(parents=True, exist_ok=True)
     target_dir = destination_root / skill
     replaced = target_dir.exists()
     if replaced and not overwrite:
         raise FileExistsError(target_dir)
-    if target_dir.exists():
-        shutil.rmtree(target_dir)
-    shutil.copytree(source_dir, target_dir)
+    temporary_dir = Path(tempfile.mkdtemp(prefix=f".{skill}.", dir=destination_root))
+    copied_dir = temporary_dir / skill
+    backup_dir = destination_root / f".{skill}.backup"
+    try:
+        shutil.copytree(source_dir, copied_dir)
+        if target_dir.exists():
+            if backup_dir.exists():
+                shutil.rmtree(backup_dir)
+            target_dir.replace(backup_dir)
+        copied_dir.replace(target_dir)
+        if backup_dir.exists():
+            shutil.rmtree(backup_dir)
+    except BaseException:
+        if not target_dir.exists() and backup_dir.exists():
+            backup_dir.replace(target_dir)
+        raise
+    finally:
+        shutil.rmtree(temporary_dir, ignore_errors=True)
     return ImportResult(skill=skill, source=source_dir, target=target_dir, replaced=replaced)
 
 

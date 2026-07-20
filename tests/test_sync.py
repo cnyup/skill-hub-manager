@@ -66,6 +66,47 @@ class SyncTests(unittest.TestCase):
             self.assertEqual(result.removed, [])
             self.assertTrue((target / "notes.txt").is_file())
 
+    def test_sync_profile_preserves_external_symlinks_not_in_profile(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "vault" / "k8s-finder"
+            external = root / "external-skill"
+            source.mkdir(parents=True)
+            external.mkdir()
+            (source / "SKILL.md").write_text("# skill", encoding="utf-8")
+            target = root / "target"
+            target.mkdir()
+            (target / "external-skill").symlink_to(external, target_is_directory=True)
+
+            result = sync_profile(
+                Profile(name="project-a", agent="codex", skills=["k8s-finder"]),
+                {"k8s-finder": Skill(name="k8s-finder", path=source)},
+                target,
+            )
+
+            self.assertEqual(result.removed, [])
+            self.assertTrue((target / "external-skill").is_symlink())
+
+    def test_sync_profile_reports_existing_regular_file_as_conflict(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "vault" / "k8s-finder"
+            source.mkdir(parents=True)
+            (source / "SKILL.md").write_text("# skill", encoding="utf-8")
+            target = root / "target"
+            target.mkdir()
+            (target / "k8s-finder").write_text("external content", encoding="utf-8")
+
+            result = sync_profile(
+                Profile(name="project-a", agent="codex", skills=["k8s-finder"]),
+                {"k8s-finder": Skill(name="k8s-finder", path=source)},
+                target,
+            )
+
+            self.assertEqual(result.linked, [])
+            self.assertEqual(result.conflicts, ["k8s-finder"])
+            self.assertTrue((target / "k8s-finder").is_file())
+
     def test_sync_profile_dry_run_reports_changes_without_touching_target(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -88,6 +129,37 @@ class SyncTests(unittest.TestCase):
             self.assertEqual(result.removed, ["old-skill"])
             self.assertFalse((target / "k8s-finder").exists())
             self.assertTrue((target / "old-skill").is_symlink())
+
+    def test_sync_profile_dry_run_does_not_create_missing_target(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "vault" / "k8s-finder"
+            source.mkdir(parents=True)
+            (source / "SKILL.md").write_text("# skill", encoding="utf-8")
+            target = root / "target"
+
+            result = sync_profile(
+                Profile(name="project-a", agent="codex", skills=["k8s-finder"]),
+                {"k8s-finder": Skill(name="k8s-finder", path=source)},
+                target,
+                dry_run=True,
+            )
+
+        self.assertEqual(result.linked, ["k8s-finder"])
+        self.assertFalse(target.exists())
+
+    def test_sync_profile_rejects_non_directory_target(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = root / "target"
+            target.write_text("not a directory", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "not a directory"):
+                sync_profile(
+                    Profile(name="project-a", agent="codex", skills=[]),
+                    {},
+                    target,
+                )
 
     def test_write_sync_state_records_profile_and_results(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -137,6 +209,7 @@ class SyncTests(unittest.TestCase):
             '  ],\n'
             '  "removed": [\n'
             '    "old-skill"\n'
-            '  ]\n'
+            '  ],\n'
+            '  "conflicts": []\n'
             '}',
         )

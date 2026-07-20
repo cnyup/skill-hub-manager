@@ -16,6 +16,7 @@ _DEFAULT_TARGETS: dict[str, Path] = {
     "claude-code": Path.home() / ".claude" / "skills",
     "cursor": Path.home() / ".cursor" / "skills",
     "windsurf": Path.home() / ".codeium" / "windsurf" / "skills",
+    "opencode": Path.home() / ".config" / "opencode" / "skills",
 }
 
 
@@ -66,7 +67,17 @@ class DetectionResult:
 
 def detect_agent_target(root: Path, agent_hint: str | None) -> DetectionResult:
     if agent_hint:
-        record = find_install_record(load_install_records(install_state_file(root)), agent_hint)
+        records = load_install_records(install_state_file(root))
+        matches = [record for record in records if record.get("agent") == agent_hint]
+        if len(matches) > 1:
+            return DetectionResult(
+                agent=agent_hint,
+                detected=False,
+                confidence="low",
+                target_dir=None,
+                reason="ambiguous-install-record",
+            )
+        record = find_install_record(records, agent_hint)
         if record and record.get("target_dir"):
             return DetectionResult(
                 agent=agent_hint,

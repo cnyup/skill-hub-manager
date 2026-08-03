@@ -129,6 +129,8 @@ skill-hub --version
 
 **为什么需要这步**：agent 需要在它的 skills 目录里看到 `skill-installer` 这个 skill，才能在第三步帮你安装业务 skill。没有它，agent 没有安装能力。
 
+把这段请求发给你的 agent（Codex、Claude Code 等）：
+
 ```text
 把 ~/skill-hub-manager/skills/skill-installer/ 软链到我的 agent skills 目录（~/.codex/skills/ 或 ~/.claude/skills/）。
 ```

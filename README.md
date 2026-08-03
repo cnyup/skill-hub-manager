@@ -129,6 +129,8 @@ Full installation notes: [docs/installation.md](docs/installation.md).
 
 **Why this step**: The agent needs the `skill-installer` skill visible in its skills directory so it can install *business* skills for you in Step 3. Without it, the agent has no installer capability.
 
+Send this request to your agent (Codex, Claude Code, etc.):
+
 ```text
 Symlink ~/skill-hub-manager/skills/skill-installer/ into my agent skills directory (~/.codex/skills/ or ~/.claude/skills/).
 ```

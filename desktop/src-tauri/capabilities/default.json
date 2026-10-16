@@ -11,7 +11,7 @@
       "allow": [
         {
           "name": "skill-hub",
-          "command": "../bin/skill-hub",
+          "cmd": "$RESOURCE/bin/skill-hub",
           "args": true
         }
       ]
@@ -21,7 +21,7 @@
       "allow": [
         {
           "name": "skill-hub",
-          "command": "../bin/skill-hub",
+          "cmd": "$RESOURCE/bin/skill-hub",
           "args": true
         }
       ]

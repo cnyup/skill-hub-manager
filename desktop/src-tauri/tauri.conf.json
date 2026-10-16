@@ -23,5 +23,12 @@
     "security": {
       "csp": null
     }
+  },
+  "bundle": {
+    "resources": {
+      "../../bin/skill-hub": "bin/skill-hub",
+      "../../src": "src"
+    },
+    "icon": ["icons/icon.png", "icons/icon-32.png", "icons/icon-128.png", "icons/icon-128@2x.png"]
   }
 }

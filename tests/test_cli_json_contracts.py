@@ -220,6 +220,38 @@ class ProfileCloneRenameJsonTests(unittest.TestCase):
         self.assertFalse((root / "profiles" / "old-name.yaml").exists())
 
 
+class SkillShowJsonTests(unittest.TestCase):
+    def test_skill_show_json_outputs_metadata_and_markdown_content(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = _make_workspace(Path(temp_dir) / "workspace")
+            _make_skill(root, "k8s-finder", "Find Kubernetes services")
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    ["skill", "show", "--root", str(root), "--name", "k8s-finder", "--json"]
+                )
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(payload["skill"]["name"], "k8s-finder")
+        self.assertEqual(payload["skill"]["description"], "Find Kubernetes services")
+        self.assertIn("# k8s-finder", payload["skill"]["content"])
+
+    def test_skill_show_json_returns_null_and_nonzero_when_missing(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = _make_workspace(Path(temp_dir) / "workspace")
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    ["skill", "show", "--root", str(root), "--name", "missing", "--json"]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(json.loads(output.getvalue()), {"skill": None})
+
+
 class RegistryBuildJsonTests(unittest.TestCase):
     def test_registry_build_json_outputs_written_path(self):
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -135,6 +135,11 @@ def build_parser() -> argparse.ArgumentParser:
     skill = subparsers.add_parser("skill")
     skill_subparsers = skill.add_subparsers(dest="skill_command")
 
+    skill_show = skill_subparsers.add_parser("show")
+    skill_show.add_argument("--root", required=True)
+    skill_show.add_argument("--name", required=True)
+    skill_show.add_argument("--json", action="store_true")
+
     skill_import = skill_subparsers.add_parser("import")
     skill_import.add_argument("--root", required=True)
     skill_import.add_argument("--source", required=True)
@@ -431,6 +436,41 @@ def _cmd_install_state_record(args: argparse.Namespace) -> int:
     }
     write_install_records(state_file, upsert_install_record(records, record))
     print(f"recorded: {state_file}")
+    return 0
+
+
+def _cmd_skill_show(args: argparse.Namespace) -> int:
+    paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
+    skill_dir = paths.skills / args.name
+    skill_file = skill_dir / "SKILL.md"
+    if not skill_file.is_file():
+        if args.json:
+            print(json.dumps({"skill": None}, indent=2))
+        else:
+            print(f"missing: {args.name}")
+        return 1
+
+    skill = scan_skills(paths.skills).get(args.name)
+    if skill is None:
+        if args.json:
+            print(json.dumps({"skill": None}, indent=2))
+        else:
+            print(f"missing: {args.name}")
+        return 1
+
+    payload = {
+        "name": skill.name,
+        "path": str(skill.path),
+        "description": skill.description,
+        "visibility": skill.visibility,
+        "agents": list(skill.agents),
+        "tags": list(skill.tags),
+        "content": skill_file.read_text(encoding="utf-8"),
+    }
+    if args.json:
+        print(json.dumps({"skill": payload}, indent=2))
+        return 0
+    print(payload["content"], end="" if payload["content"].endswith("\n") else "\n")
     return 0
 
 
@@ -843,6 +883,7 @@ _DISPATCH: dict[tuple[str, str | None], callable] = {
     ("doctor", None): _cmd_doctor,
     ("install-state", "show"): _cmd_install_state_show,
     ("install-state", "record"): _cmd_install_state_record,
+    ("skill", "show"): _cmd_skill_show,
     ("skill", "import"): _cmd_skill_import,
     ("skill", "remove"): _cmd_skill_remove,
     ("skill", "update"): _cmd_skill_update,

@@ -6,6 +6,7 @@
  * - 接口形状对齐 HTTP API 语义，将来升级 sidecar/重写只换本目录；
  * - Rust 侧 tauri-plugin-shell scope 白名单仅放行 skill-hub 包装器。
  */
+import { homeDir } from "@tauri-apps/api/path";
 import { Command } from "@tauri-apps/plugin-shell";
 
 export class CliError extends Error {
@@ -64,6 +65,10 @@ export interface RegistryEntry {
   tags?: string[];
 }
 
+export interface SkillDetail extends RegistryEntry {
+  content: string;
+}
+
 export interface ProfilePayload {
   name: string;
   agent: string;
@@ -89,6 +94,28 @@ export interface SyncResultPayload {
   removed: string[];
 }
 
+export interface ProfileValidation {
+  profile: string;
+  valid: boolean;
+  issues: string[];
+}
+
+export type SkillSourceRecord = Record<string, string>;
+
+/** Resolve the active workspace, keeping compatibility with the pre-standard ~/skills-hub location. */
+export async function resolveWorkspaceRoot(): Promise<string> {
+  const home = (await homeDir()).replace(/\/$/, "");
+  const standard = `${home}/.skill-hub`;
+  const legacy = `${home}/skills-hub`;
+
+  const [standardSkills, legacySkills] = await Promise.all([
+    listSkills(standard).catch(() => []),
+    listSkills(legacy).catch(() => []),
+  ]);
+  if (standardSkills.length === 0 && legacySkills.length > 0) return legacy;
+  return standard;
+}
+
 // ---------- 只读 API ----------
 
 export async function listSkills(root: string): Promise<RegistryEntry[]> {
@@ -105,11 +132,32 @@ export async function findSkills(root: string, query: string): Promise<RegistryE
   return data.skills;
 }
 
+export async function getSkillDetail(root: string, name: string): Promise<SkillDetail> {
+  const { data } = await runCliJson<{ skill: SkillDetail }>([
+    "skill", "show", "--root", root, "--name", name, "--json",
+  ]);
+  return data.skill;
+}
+
 export async function getProfile(root: string, name: string): Promise<ProfilePayload> {
   const { data } = await runCliJson<{ profile: ProfilePayload }>([
     "profile", "show", "--root", root, "--name", name, "--json",
   ]);
   return data.profile;
+}
+
+export async function getSkillSource(root: string, name: string): Promise<SkillSourceRecord | null> {
+  const { data } = await runCliJson<{ record: SkillSourceRecord | null }>([
+    "skill", "source", "show", "--root", root, "--name", name, "--json",
+  ]);
+  return data.record;
+}
+
+export async function validateProfiles(root: string): Promise<ProfileValidation[]> {
+  const { data } = await runCliJson<{ profiles: ProfileValidation[] }>([
+    "profile", "validate", "--root", root, "--json",
+  ]);
+  return data.profiles;
 }
 
 export async function listProfiles(root: string): Promise<string[]> {

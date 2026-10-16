@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+from skill_hub_manager.fsutil import atomic_write_text
+
 
 @dataclass(frozen=True)
 class WorkspacePaths:
@@ -38,9 +40,9 @@ def initialize_workspace(root: Path) -> WorkspacePaths:
 
     default_profile = paths.profiles / "default.yaml"
     if not default_profile.exists():
-        default_profile.write_text(
+        atomic_write_text(
+            default_profile,
             "name: default\nagent: codex\nskills:\n",
-            encoding="utf-8",
         )
 
     return paths

@@ -3,6 +3,8 @@ from fnmatch import fnmatch
 import json
 from pathlib import Path
 
+from skill_hub_manager.fsutil import atomic_write_text
+
 
 @dataclass(frozen=True)
 class Profile:
@@ -40,7 +42,7 @@ def write_profile(profiles_dir: Path, profile: Profile, overwrite: bool = False)
     path = profile_path(profiles_dir, profile.name)
     if path.exists() and not overwrite:
         raise FileExistsError(path)
-    path.write_text(_render_profile(profile), encoding="utf-8")
+    atomic_write_text(path, _render_profile(profile))
     return path
 
 

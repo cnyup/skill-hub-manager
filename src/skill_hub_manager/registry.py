@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from skill_hub_manager.fsutil import atomic_write_text
 from skill_hub_manager.skills import scan_skills
 
 
@@ -22,7 +23,7 @@ def build_registry(vault: Path) -> str:
 
 def write_registry(vault: Path, output: Path) -> Path:
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(build_registry(vault), encoding="utf-8")
+    atomic_write_text(output, build_registry(vault))
     return output
 
 

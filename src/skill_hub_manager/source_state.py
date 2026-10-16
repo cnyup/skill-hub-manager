@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from skill_hub_manager.fsutil import atomic_write_text
+
 
 def load_source_records(path: Path) -> list[dict[str, str]]:
     if not path.exists():
@@ -13,8 +15,7 @@ def load_source_records(path: Path) -> list[dict[str, str]]:
 
 
 def write_source_records(path: Path, records: list[dict[str, str]]) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"records": records}, indent=2) + "\n", encoding="utf-8")
+    atomic_write_text(path, json.dumps({"records": records}, indent=2) + "\n")
     return path
 
 

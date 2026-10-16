@@ -2,6 +2,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from skill_hub_manager.fsutil import atomic_write_text
 from skill_hub_manager.profiles import Profile
 from skill_hub_manager.skills import Skill
 
@@ -50,7 +51,6 @@ def write_sync_state(
     missing: list[str],
     removed: list[str],
 ) -> Path:
-    state_file.parent.mkdir(parents=True, exist_ok=True)
     state = {
         "profile": profile.name,
         "agent": profile.agent,
@@ -59,7 +59,10 @@ def write_sync_state(
         "missing": missing,
         "removed": removed,
     }
-    state_file.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+    atomic_write_text(
+        state_file,
+        json.dumps(state, indent=2) + "\n",
+    )
     return state_file
 
 

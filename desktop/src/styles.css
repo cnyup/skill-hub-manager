@@ -1,0 +1,41 @@
+/* skill-hub desktop — shadcn zinc light tokens (方案 1) */
+:root {
+  --background: #ffffff;
+  --sidebar: #fafafa;
+  --border: #e4e4e7;
+  --foreground: #18181b;
+  --muted-foreground: #71717a;
+  --subtle: #f4f4f5;
+  --primary: #18181b;
+  --primary-foreground: #ffffff;
+  --accent-blue-bg: #eff6ff;
+  --accent-blue-fg: #1d4ed8;
+  --accent-blue-border: #bfdbfe;
+  --success: #1b7339;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, "SF Pro Text", "PingFang SC", "Helvetica Neue",
+    sans-serif;
+  font-size: 13px;
+  color: var(--foreground);
+  background: var(--background);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+.mono {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}

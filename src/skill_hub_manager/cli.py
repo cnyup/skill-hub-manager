@@ -91,6 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
     registry_build.add_argument("--vault")
     registry_build.add_argument("--output")
     registry_build.add_argument("--root")
+    registry_build.add_argument("--json", action="store_true")
 
     registry_doctor = registry_subparsers.add_parser("doctor")
     registry_doctor.add_argument("--vault")
@@ -110,6 +111,7 @@ def build_parser() -> argparse.ArgumentParser:
     doctor = subparsers.add_parser("doctor")
     doctor.add_argument("--target")
     doctor.add_argument("--root")
+    doctor.add_argument("--json", action="store_true")
 
     install_state = subparsers.add_parser("install-state")
     install_state_subparsers = install_state.add_subparsers(dest="install_state_command")
@@ -174,10 +176,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     profile_list = profile_subparsers.add_parser("list")
     profile_list.add_argument("--root", required=True)
+    profile_list.add_argument("--json", action="store_true")
 
     profile_show = profile_subparsers.add_parser("show")
     profile_show.add_argument("--root", required=True)
     profile_show.add_argument("--name", required=True)
+    profile_show.add_argument("--json", action="store_true")
 
     profile_add = profile_subparsers.add_parser("add")
     profile_add.add_argument("--root", required=True)
@@ -185,10 +189,12 @@ def build_parser() -> argparse.ArgumentParser:
     profile_add.add_argument("--agent", required=True)
     profile_add.add_argument("--skill", action="append", required=True)
     profile_add.add_argument("--exclude", action="append", default=[])
+    profile_add.add_argument("--json", action="store_true")
 
     profile_remove = profile_subparsers.add_parser("remove")
     profile_remove.add_argument("--root", required=True)
     profile_remove.add_argument("--name", required=True)
+    profile_remove.add_argument("--json", action="store_true")
 
     profile_update = profile_subparsers.add_parser("update")
     profile_update.add_argument("--root", required=True)
@@ -198,16 +204,19 @@ def build_parser() -> argparse.ArgumentParser:
     profile_update.add_argument("--remove-skill", action="append", default=[])
     profile_update.add_argument("--add-exclude", action="append", default=[])
     profile_update.add_argument("--remove-exclude", action="append", default=[])
+    profile_update.add_argument("--json", action="store_true")
 
     profile_clone = profile_subparsers.add_parser("clone")
     profile_clone.add_argument("--root", required=True)
     profile_clone.add_argument("--name", required=True)
     profile_clone.add_argument("--to", required=True)
+    profile_clone.add_argument("--json", action="store_true")
 
     profile_rename = profile_subparsers.add_parser("rename")
     profile_rename.add_argument("--root", required=True)
     profile_rename.add_argument("--name", required=True)
     profile_rename.add_argument("--to", required=True)
+    profile_rename.add_argument("--json", action="store_true")
 
     profile_validate = profile_subparsers.add_parser("validate")
     profile_validate.add_argument("--root", required=True)
@@ -288,6 +297,9 @@ def _cmd_init(args: argparse.Namespace) -> int:
 def _cmd_registry_build(args: argparse.Namespace) -> int:
     vault, output_path = _resolve_registry_paths(args)
     output = write_registry(vault, output_path)
+    if getattr(args, "json", False):
+        print(json.dumps({"wrote": str(output)}, indent=2))
+        return 0
     print(f"wrote: {output}")
     return 0
 
@@ -361,6 +373,14 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     target = _resolve_doctor_target(args)
     broken = find_broken_links(target)
     expected_missing = _resolve_expected_missing(args, target)
+    if getattr(args, "json", False):
+        print(
+            json.dumps(
+                {"broken": broken, "expected_missing": expected_missing},
+                indent=2,
+            )
+        )
+        return 1 if broken or expected_missing else 0
     for name in broken:
         print(f"broken: {name}")
     for name in expected_missing:
@@ -642,16 +662,33 @@ def _cmd_skill_source_show(args: argparse.Namespace) -> int:
     return 0
 
 
+def _render_profile_json(profile: Profile) -> dict[str, str | list[str]]:
+    return {
+        "name": profile.name,
+        "agent": profile.agent,
+        "skills": profile.skills,
+        "exclude": profile.exclude,
+        "effective_skills": profile.effective_skills(),
+    }
+
+
 def _cmd_profile_list(args: argparse.Namespace) -> int:
     paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
-    for path in list_profiles(paths.profiles):
-        print(path.stem)
+    names = [path.stem for path in list_profiles(paths.profiles)]
+    if getattr(args, "json", False):
+        print(json.dumps({"profiles": names}, indent=2))
+        return 0
+    for name in names:
+        print(name)
     return 0
 
 
 def _cmd_profile_show(args: argparse.Namespace) -> int:
     paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
     profile = load_profile(paths.profiles / f"{args.name}.yaml")
+    if getattr(args, "json", False):
+        print(json.dumps({"profile": _render_profile_json(profile)}, indent=2))
+        return 0
     print(f"name: {profile.name}")
     print(f"agent: {profile.agent}")
     print(f"skills: [{', '.join(profile.skills)}]")
@@ -673,8 +710,14 @@ def _cmd_profile_add(args: argparse.Namespace) -> int:
             ),
         )
     except FileExistsError as error:
-        print(f"exists: {error.args[0]}")
+        if getattr(args, "json", False):
+            print(json.dumps({"error": f"exists: {error.args[0]}"}, indent=2))
+        else:
+            print(f"exists: {error.args[0]}")
         return 1
+    if getattr(args, "json", False):
+        print(json.dumps({"written": str(path)}, indent=2))
+        return 0
     print(f"wrote: {path}")
     return 0
 
@@ -682,6 +725,9 @@ def _cmd_profile_add(args: argparse.Namespace) -> int:
 def _cmd_profile_remove(args: argparse.Namespace) -> int:
     paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
     removed = remove_profile(paths.profiles, args.name)
+    if getattr(args, "json", False):
+        print(json.dumps({"removed": removed}, indent=2))
+        return 0 if removed else 1
     if removed:
         print(f"removed: {paths.profiles / f'{args.name}.yaml'}")
         return 0
@@ -702,6 +748,14 @@ def _cmd_profile_update(args: argparse.Namespace) -> int:
         remove_exclude=args.remove_exclude,
     )
     write_profile(paths.profiles, updated, overwrite=True)
+    if getattr(args, "json", False):
+        print(
+            json.dumps(
+                {"updated": str(path), "profile": _render_profile_json(updated)},
+                indent=2,
+            )
+        )
+        return 0
     print(f"updated: {path}")
     return 0
 
@@ -711,8 +765,14 @@ def _cmd_profile_clone(args: argparse.Namespace) -> int:
     try:
         path = clone_profile(paths.profiles, args.name, args.to)
     except FileExistsError as error:
-        print(f"exists: {error.args[0]}")
+        if getattr(args, "json", False):
+            print(json.dumps({"error": f"exists: {error.args[0]}"}, indent=2))
+        else:
+            print(f"exists: {error.args[0]}")
         return 1
+    if getattr(args, "json", False):
+        print(json.dumps({"cloned": str(path)}, indent=2))
+        return 0
     print(f"cloned: {path}")
     return 0
 
@@ -722,8 +782,14 @@ def _cmd_profile_rename(args: argparse.Namespace) -> int:
     try:
         path = rename_profile(paths.profiles, args.name, args.to)
     except FileExistsError as error:
-        print(f"exists: {error.args[0]}")
+        if getattr(args, "json", False):
+            print(json.dumps({"error": f"exists: {error.args[0]}"}, indent=2))
+        else:
+            print(f"exists: {error.args[0]}")
         return 1
+    if getattr(args, "json", False):
+        print(json.dumps({"renamed": str(path)}, indent=2))
+        return 0
     print(f"renamed: {path}")
     return 0
 

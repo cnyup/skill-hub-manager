@@ -2,8 +2,23 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
-REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+REPO_ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 
 export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 
-exec python3 -m skill_hub_manager.cli "$@"
+# Find a Python interpreter that satisfies the >=3.11 requirement.
+# Resolution order: SKILL_HUB_PYTHON env override, then newest-first versioned
+# lookups, then the plain python3 fallback (documented >=3.11 environments).
+if [ -n "${SKILL_HUB_PYTHON:-}" ]; then
+    PY="$SKILL_HUB_PYTHON"
+else
+    PY=""
+    for candidate in python3.13 python3.12 python3.11 python3; do
+        if command -v "$candidate" >/dev/null 2>&1; then
+            PY="$candidate"
+            break
+        fi
+    done
+fi
+
+exec "$PY" -m skill_hub_manager.cli "$@"

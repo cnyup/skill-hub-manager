@@ -11,3 +11,6 @@ skill-hub = "skill_hub_manager.cli:entrypoint"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

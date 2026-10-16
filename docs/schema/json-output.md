@@ -240,3 +240,181 @@ Notes:
 
 - `effective_skills` reflects `exclude` processing
 - `missing_skills` is the subset of effective skills absent from the vault
+
+## `profile list --json`
+
+Command:
+
+```bash
+skill-hub profile list --root <path> --json
+```
+
+Shape:
+
+```json
+{
+  "profiles": ["alpha", "default"]
+}
+```
+
+Notes:
+
+- `profiles` is sorted alphabetically (same order as the text output)
+
+## `profile show --json`
+
+Command:
+
+```bash
+skill-hub profile show --root <path> --name <profile> --json
+```
+
+Shape:
+
+```json
+{
+  "profile": {
+    "name": "default",
+    "agent": "codex",
+    "skills": ["k8s-finder", "experimental-k8s"],
+    "exclude": ["experimental-*"],
+    "effective_skills": ["k8s-finder"]
+  }
+}
+```
+
+Notes:
+
+- `effective_skills` reflects `exclude` (fnmatch) processing
+
+## `profile add --json`
+
+Command:
+
+```bash
+skill-hub profile add --root <path> --name <n> --agent <a> --skill <s> [--exclude <e>] --json
+```
+
+Shape (success):
+
+```json
+{
+  "written": "/path/to/workspace/profiles/codex.yaml"
+}
+```
+
+Shape (conflict, exit code 1):
+
+```json
+{
+  "error": "exists: /path/to/workspace/profiles/codex.yaml"
+}
+```
+
+## `profile remove --json`
+
+Command:
+
+```bash
+skill-hub profile remove --root <path> --name <n> --json
+```
+
+Shape:
+
+```json
+{
+  "removed": true
+}
+```
+
+Notes:
+
+- `removed` is `false` (exit code 1) when the profile does not exist
+
+## `profile update --json`
+
+Command:
+
+```bash
+skill-hub profile update --root <path> --name <n> [--agent <a>] [--add-skill <s>] ... --json
+```
+
+Shape:
+
+```json
+{
+  "updated": "/path/to/workspace/profiles/codex.yaml",
+  "profile": {
+    "name": "codex",
+    "agent": "codex",
+    "skills": ["k8s-finder", "web-access"],
+    "exclude": [],
+    "effective_skills": ["k8s-finder", "web-access"]
+  }
+}
+```
+
+## `profile clone --json` / `profile rename --json`
+
+Commands:
+
+```bash
+skill-hub profile clone --root <path> --name <n> --to <n2> --json
+skill-hub profile rename --root <path> --name <n> --to <n2> --json
+```
+
+Shapes:
+
+```json
+{
+  "cloned": "/path/to/workspace/profiles/n2.yaml"
+}
+```
+
+```json
+{
+  "renamed": "/path/to/workspace/profiles/n2.yaml"
+}
+```
+
+Notes:
+
+- Conflict path outputs `{"error": "exists: ..."}` with exit code 1 (same as `profile add`)
+
+## `registry build --json`
+
+Command:
+
+```bash
+skill-hub registry build --root <path> --json
+```
+
+Shape:
+
+```json
+{
+  "wrote": "/path/to/workspace/state/registry.yaml"
+}
+```
+
+## `doctor --json`
+
+Command:
+
+```bash
+skill-hub doctor --target <path> [--root <path>] --json
+```
+
+Shape:
+
+```json
+{
+  "broken": ["broken-link"],
+  "expected_missing": []
+}
+```
+
+Notes:
+
+- Exit code 1 when either list is non-empty (same semantics as the text output)
+- `expected_missing` requires `--root` (reads `state/last-sync.json`); empty otherwise

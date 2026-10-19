@@ -10,6 +10,11 @@ vi.mock("./api/client", async () => {
     ...actual,
     getVersion: vi.fn(),
     resolveWorkspaceRoot: vi.fn(),
+    listAgentTargets: vi.fn(),
+    dryRunSync: vi.fn(),
+    applySync: vi.fn(),
+    createProfile: vi.fn(),
+    updateProfile: vi.fn(),
     listSkills: vi.fn(),
     listProfiles: vi.fn(),
     getProfile: vi.fn(),
@@ -29,6 +34,23 @@ afterEach(cleanup);
 
 beforeEach(() => {
   mocked.resolveWorkspaceRoot.mockResolvedValue("/Users/test/.skill-hub");
+  mocked.listAgentTargets.mockResolvedValue([
+    { agent: "codex", target: "/Users/test/.codex/skills" },
+    { agent: "claude", target: "/Users/test/.claude/skills" },
+  ]);
+  mocked.dryRunSync.mockResolvedValue({
+    mode: "dry-run", profile: "claude", agent: "claude",
+    target: "/Users/test/.claude/skills", linked: ["k8s-finder"], missing: [], removed: [],
+  });
+  mocked.applySync.mockResolvedValue({
+    mode: "apply", profile: "claude", agent: "claude",
+    target: "/Users/test/.claude/skills", linked: ["k8s-finder"], missing: [], removed: [],
+  });
+  mocked.createProfile.mockResolvedValue({ written: "/Users/test/.skill-hub/profiles/claude.yaml" });
+  mocked.updateProfile.mockResolvedValue({
+    updated: "/Users/test/.skill-hub/profiles/default.yaml",
+    profile: { name: "default", agent: "codex", skills: ["k8s-finder"], exclude: [], effective_skills: ["k8s-finder"] },
+  });
   mocked.getVersion.mockResolvedValue("skill-hub 0.1.0");
   mocked.listSkills.mockResolvedValue([
     {
@@ -116,6 +138,154 @@ describe("Wave 3 desktop shell", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Profiles" }));
     expect(details).toHaveTextContent("default");
     expect(mocked.getSkillDetail).toHaveBeenCalledWith("/Users/test/.skill-hub", "k8s-finder");
+  });
+
+  it("clicks a sidebar profile to show only its configured and effective skills", async () => {
+    mocked.listProfiles.mockResolvedValue(["codex", "cursor"]);
+    mocked.getProfile.mockImplementation(async (_root, name) => ({
+      name,
+      agent: name,
+      skills: name === "codex" ? ["k8s-finder", "experimental-k8s"] : ["release-notes"],
+      exclude: name === "codex" ? ["experimental-*"] : [],
+      effective_skills: name === "codex" ? ["k8s-finder"] : ["release-notes"],
+    }));
+    mocked.auditAll.mockResolvedValue([]);
+    render(<App />);
+    await screen.findByText("k8s-finder");
+
+    fireEvent.click(screen.getByRole("button", { name: "打开 profile codex" }));
+
+    const codexCard = await screen.findByRole("article", { name: "Profile codex" });
+    expect(codexCard).toHaveTextContent("Configured skills");
+    expect(codexCard).toHaveTextContent("experimental-k8s");
+    expect(codexCard).toHaveTextContent("Effective skills");
+    expect(screen.queryByRole("heading", { name: "cursor" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Agents" }));
+    expect(await screen.findByRole("heading", { name: "cursor" })).toBeInTheDocument();
+  });
+
+  it("filters only the reserved all-agent profile from every desktop view", async () => {
+    mocked.listProfiles.mockResolvedValue(["default", "all-agent", "all-agent-extra"]);
+    mocked.getProfile.mockImplementation(async (_root, name) => ({
+      name,
+      agent: "codex",
+      skills: ["k8s-finder"],
+      exclude: [],
+      effective_skills: ["k8s-finder"],
+    }));
+    mocked.auditAll.mockResolvedValue([
+      { profile: "all-agent", agent: "all-agent", effective_skills: ["k8s-finder"], missing_skills: [] },
+      { profile: "all-agent-extra", agent: "codex", effective_skills: ["k8s-finder"], missing_skills: [] },
+    ]);
+    render(<App />);
+    await screen.findByText("k8s-finder");
+
+    expect(screen.queryByRole("button", { name: "打开 profile all-agent" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "打开 profile all-agent-extra" })).toBeInTheDocument();
+    expect(screen.queryByText("all-agent", { selector: ".badge" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Agents" }));
+    expect(screen.queryByRole("heading", { name: "all-agent" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "all-agent-extra" })).toBeInTheDocument();
+  });
+
+  it("deduplicates claude-code into the canonical claude assignment target", async () => {
+    mocked.listAgentTargets.mockResolvedValue([
+      { agent: "claude", target: "/Users/test/.claude/skills" },
+      { agent: "claude-code", target: "/Users/test/.claude/skills" },
+    ]);
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /k8s-finder/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "分配给 Agent" }));
+
+    expect(screen.getAllByRole("checkbox")).toHaveLength(1);
+    expect(screen.getByRole("checkbox", { name: "claude" })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "claude-code" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "claude" }));
+    fireEvent.click(screen.getByRole("button", { name: "预览同步" }));
+    await waitFor(() => expect(mocked.dryRunSync).toHaveBeenCalledTimes(1));
+    expect(mocked.dryRunSync).toHaveBeenCalledWith(
+      "/Users/test/.skill-hub",
+      "/Users/test/.claude/skills",
+      "claude",
+      { addSkills: ["k8s-finder"], agent: "claude" },
+    );
+  });
+
+  it("multi-selects agents and assigns to each selected target", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /k8s-finder/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "分配给 Agent" }));
+
+    // 两个 agent 都勾选 → 多选分配
+    fireEvent.click(screen.getByRole("checkbox", { name: /codex/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /claude/ }));
+    fireEvent.click(screen.getByRole("button", { name: "预览同步" }));
+
+    await waitFor(() => expect(mocked.dryRunSync).toHaveBeenCalledTimes(2));
+    expect(mocked.dryRunSync).toHaveBeenCalledWith(
+      "/Users/test/.skill-hub",
+      "/Users/test/.codex/skills",
+      "codex",
+      { addSkills: ["k8s-finder"], agent: "codex" },
+    );
+    expect(mocked.dryRunSync).toHaveBeenCalledWith(
+      "/Users/test/.skill-hub",
+      "/Users/test/.claude/skills",
+      "claude",
+      { addSkills: ["k8s-finder"], agent: "claude" },
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "确认分配并同步" }));
+    await waitFor(() => expect(mocked.applySync).toHaveBeenCalledTimes(2));
+    expect(mocked.applySync).toHaveBeenCalledWith(
+      "/Users/test/.skill-hub", "/Users/test/.codex/skills", "codex",
+    );
+    expect(mocked.applySync).toHaveBeenCalledWith(
+      "/Users/test/.skill-hub", "/Users/test/.claude/skills", "claude",
+    );
+  });
+
+  it("previews assignment without writing and persists only after confirmation", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /k8s-finder/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "分配给 Agent" }));
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /claude/ }));
+    fireEvent.click(screen.getByRole("button", { name: "预览同步" }));
+
+    expect(await screen.findByText("将链接 1 个 skill")).toBeInTheDocument();
+    expect(mocked.dryRunSync).toHaveBeenCalledWith(
+      "/Users/test/.skill-hub",
+      "/Users/test/.claude/skills",
+      "claude",
+      { addSkills: ["k8s-finder"], agent: "claude" },
+    );
+    expect(mocked.createProfile).not.toHaveBeenCalled();
+    expect(mocked.updateProfile).not.toHaveBeenCalled();
+    expect(mocked.applySync).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "确认分配并同步" }));
+    await waitFor(() => expect(mocked.createProfile).toHaveBeenCalledWith(
+      "/Users/test/.skill-hub", "claude", "claude", ["k8s-finder"],
+    ));
+    expect(mocked.applySync).toHaveBeenCalledWith(
+      "/Users/test/.skill-hub", "/Users/test/.claude/skills", "claude",
+    );
+  });
+
+  it("closes assignment preview without persisting changes", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /k8s-finder/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "分配给 Agent" }));
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+
+    expect(screen.queryByRole("dialog", { name: "分配给 Agent" })).not.toBeInTheDocument();
+    expect(mocked.createProfile).not.toHaveBeenCalled();
+    expect(mocked.updateProfile).not.toHaveBeenCalled();
+    expect(mocked.applySync).not.toHaveBeenCalled();
   });
 
   it("opens command search with Meta+K, filters skills and navigates", async () => {

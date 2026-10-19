@@ -6,6 +6,9 @@ from pathlib import Path
 from skill_hub_manager.fsutil import atomic_write_text
 
 
+_RESERVED_PROFILE_NAMES = {"all-agent"}
+
+
 @dataclass(frozen=True)
 class Profile:
     name: str
@@ -34,7 +37,13 @@ def load_profile(path: Path) -> Profile:
 def list_profiles(profiles_dir: Path) -> list[Path]:
     if not profiles_dir.exists():
         return []
-    return sorted(path for path in profiles_dir.iterdir() if path.is_file() and path.suffix == ".yaml")
+    return sorted(
+        path
+        for path in profiles_dir.iterdir()
+        if path.is_file()
+        and path.suffix == ".yaml"
+        and path.stem not in _RESERVED_PROFILE_NAMES
+    )
 
 
 def write_profile(profiles_dir: Path, profile: Profile, overwrite: bool = False) -> Path:

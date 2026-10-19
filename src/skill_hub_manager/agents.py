@@ -13,10 +13,21 @@ from skill_hub_manager.paths import install_state_file
 _DEFAULT_TARGETS: dict[str, Path] = {
     "codex": Path.home() / ".codex" / "skills",
     "claude": Path.home() / ".claude" / "skills",
-    "claude-code": Path.home() / ".claude" / "skills",
     "cursor": Path.home() / ".cursor" / "skills",
     "windsurf": Path.home() / ".codeium" / "windsurf" / "skills",
 }
+
+_AGENT_ALIASES = {"claude-code": "claude"}
+
+
+def canonical_agent_name(agent: str) -> str:
+    return _AGENT_ALIASES.get(agent, agent)
+
+
+def _agent_lookup_names(agent: str) -> tuple[str, ...]:
+    canonical = canonical_agent_name(agent)
+    aliases = tuple(alias for alias, target in _AGENT_ALIASES.items() if target == canonical)
+    return (canonical, *aliases)
 
 
 def load_builtin_targets(workspace_root: Path | None = None) -> dict[str, Path]:
@@ -35,7 +46,7 @@ def load_builtin_targets(workspace_root: Path | None = None) -> dict[str, Path]:
         try:
             overrides = json.loads(env_value)
             for agent, path_str in overrides.items():
-                targets[agent] = Path(path_str).expanduser()
+                targets[canonical_agent_name(agent)] = Path(path_str).expanduser()
         except (json.JSONDecodeError, TypeError):
             pass
 
@@ -50,9 +61,14 @@ def load_builtin_targets(workspace_root: Path | None = None) -> dict[str, Path]:
                 agent = agent.strip()
                 path_str = path_str.strip()
                 if agent and path_str:
-                    targets[agent] = Path(path_str).expanduser()
+                    targets[canonical_agent_name(agent)] = Path(path_str).expanduser()
 
     return targets
+
+
+def list_agent_targets(workspace_root: Path | None = None) -> dict[str, Path]:
+    """Return the configured Agent-to-skills-directory mapping."""
+    return load_builtin_targets(workspace_root)
 
 
 @dataclass(frozen=True)
@@ -66,26 +82,35 @@ class DetectionResult:
 
 def detect_agent_target(root: Path, agent_hint: str | None) -> DetectionResult:
     if agent_hint:
-        record = find_install_record(load_install_records(install_state_file(root)), agent_hint)
+        canonical_agent = canonical_agent_name(agent_hint)
+        records = load_install_records(install_state_file(root))
+        record = next(
+            (
+                found
+                for lookup_name in _agent_lookup_names(canonical_agent)
+                if (found := find_install_record(records, lookup_name)) is not None
+            ),
+            None,
+        )
         if record and record.get("target_dir"):
             return DetectionResult(
-                agent=agent_hint,
+                agent=canonical_agent,
                 detected=True,
                 confidence="high",
                 target_dir=Path(record["target_dir"]),
                 reason="previous-install-record",
             )
         builtin_targets = load_builtin_targets(root)
-        if agent_hint in builtin_targets:
+        if canonical_agent in builtin_targets:
             return DetectionResult(
-                agent=agent_hint,
+                agent=canonical_agent,
                 detected=True,
                 confidence="medium",
-                target_dir=builtin_targets[agent_hint],
+                target_dir=builtin_targets[canonical_agent],
                 reason="builtin-agent-mapping",
             )
     return DetectionResult(
-        agent=agent_hint,
+        agent=canonical_agent_name(agent_hint) if agent_hint else None,
         detected=False,
         confidence="low",
         target_dir=None,

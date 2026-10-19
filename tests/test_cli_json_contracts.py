@@ -16,6 +16,29 @@ from pathlib import Path
 from skill_hub_manager.cli import main
 
 
+class AgentListJsonTests(unittest.TestCase):
+    def test_agent_list_json_outputs_configured_targets(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            root.mkdir(parents=True)
+            (root / "agents.yaml").write_text(
+                "custom-agent: ~/custom-agent-skills\n",
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["agent", "list", "--root", str(root), "--json"])
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(exit_code, 0)
+        targets = {item["agent"]: item["target"] for item in payload["agents"]}
+        self.assertEqual(targets["codex"], str(Path.home() / ".codex" / "skills"))
+        self.assertEqual(targets["custom-agent"], str(Path.home() / "custom-agent-skills"))
+        self.assertIn("claude", targets)
+        self.assertNotIn("claude-code", targets)
+
+
 def _make_workspace(root: Path) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     (root / "skills").mkdir(exist_ok=True)
@@ -44,6 +67,7 @@ class ProfileListJsonTests(unittest.TestCase):
             profiles = root / "profiles"
             (profiles / "zebra.yaml").write_text("name: zebra\nagent: codex\nskills:\n", encoding="utf-8")
             (profiles / "alpha.yaml").write_text("name: alpha\nagent: claude\nskills:\n", encoding="utf-8")
+            (profiles / "all-agent.yaml").write_text("name: all-agent\nagent: codex\nskills:\n", encoding="utf-8")
             output = io.StringIO()
 
             with contextlib.redirect_stdout(output):

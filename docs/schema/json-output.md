@@ -9,6 +9,8 @@ Commands:
 ```bash
 skill-hub sync --root <path> --target <path> --json
 skill-hub sync --root <path> --target <path> --dry-run --json
+skill-hub sync --root <path> --profile-name <name> --target <path> \
+  --add-skill <skill> [--remove-skill <skill>] --dry-run --json
 ```
 
 Shape:
@@ -31,6 +33,11 @@ Notes:
 - `linked` is the final desired linked skill set processed in this run
 - `missing` contains requested skills not found in the vault
 - `removed` contains stale symlink names removed or planned for removal
+
+The dry-run form may include `--add-skill` and `--remove-skill` with
+`--profile-name`. These changes are applied to an in-memory candidate profile
+only: the profile file, target directory, links, and sync state remain
+unchanged. Candidate flags without `--dry-run` fail with exit code `2`.
 
 ## `profile validate --json`
 

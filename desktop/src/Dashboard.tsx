@@ -12,26 +12,33 @@ import {
   X,
 } from "lucide-react";
 import {
+  applySync,
   auditAll,
+  createProfile,
   doctor,
+  dryRunSync,
   findSkills,
   getProfile,
   getSkillDetail,
   getSkillSource,
   getVersion,
+  listAgentTargets,
   listProfiles,
   listSkills,
   registryDoctor,
   resolveWorkspaceRoot,
+  updateProfile,
   validateProfiles,
 } from "./api/client";
 import type {
+  AgentTarget,
   AuditReport,
   ProfilePayload,
   ProfileValidation,
   RegistryEntry,
   SkillDetail,
   SkillSourceRecord,
+  SyncResultPayload,
 } from "./api/client";
 
 type View = "library" | "agents" | "doctor";
@@ -41,6 +48,21 @@ interface HealthState {
   registry: { ok: boolean; issues: string[] };
   links: { broken: string[]; expected_missing: string[]; hasIssues: boolean };
   profiles: ProfileValidation[];
+}
+
+const RESERVED_PROFILE_NAMES = new Set(["all-agent"]);
+
+function visibleProfileName(name: string): boolean {
+  return !RESERVED_PROFILE_NAMES.has(name);
+}
+
+function normalizeAgentTargets(targets: AgentTarget[]): AgentTarget[] {
+  const normalized = new Map<string, AgentTarget>();
+  for (const target of targets) {
+    const agent = target.agent === "claude-code" ? "claude" : target.agent;
+    if (!normalized.has(agent) || target.agent === agent) normalized.set(agent, { ...target, agent });
+  }
+  return [...normalized.values()];
 }
 
 const EMPTY_HEALTH: HealthState = {
@@ -61,13 +83,17 @@ export default function App() {
   const [profiles, setProfiles] = useState<ProfilePayload[]>([]);
   const [audit, setAudit] = useState<AuditReport[]>([]);
   const [health, setHealth] = useState<HealthState>(EMPTY_HEALTH);
+  const [agentTargets, setAgentTargets] = useState<AgentTarget[]>([]);
   const [selectedSkill, setSelectedSkill] = useState<RegistryEntry | null>(null);
   const [selectedDetail, setSelectedDetail] = useState<SkillDetail | null>(null);
   const [selectedSource, setSelectedSource] = useState<SkillSourceRecord | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailWarning, setDetailWarning] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [highlightedProfile, setHighlightedProfile] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     void resolveWorkspaceRoot().then(setRoot).catch((error) => setFatalError(String(error)));
@@ -83,26 +109,32 @@ export default function App() {
         setVersion(nextVersion);
 
         const nextWarnings: string[] = [];
-        const [nextSkills, nextProfileNames, nextAudit, nextRegistry, nextLinks, nextValidation] = await Promise.all([
+        const [nextSkills, nextProfileNames, nextAudit, nextRegistry, nextLinks, nextValidation, nextAgents] = await Promise.all([
           listSkills(root).catch((error) => { nextWarnings.push(`Library: ${String(error)}`); return []; }),
           listProfiles(root).catch((error) => { nextWarnings.push(`Profiles: ${String(error)}`); return []; }),
           auditAll(root).catch((error) => { nextWarnings.push(`Audit: ${String(error)}`); return []; }),
           registryDoctor(root).catch((error) => { nextWarnings.push(`Registry doctor: ${String(error)}`); return EMPTY_HEALTH.registry; }),
           doctor(root).catch((error) => { nextWarnings.push(`Link doctor: ${String(error)}`); return EMPTY_HEALTH.links; }),
           validateProfiles(root).catch((error) => { nextWarnings.push(`Profile validate: ${String(error)}`); return []; }),
+          listAgentTargets(root).catch((error) => { nextWarnings.push(`Agent targets: ${String(error)}`); return []; }),
         ]);
+        const visibleNames = nextProfileNames.filter(visibleProfileName);
+        const visibleAudit = nextAudit.filter((report) => visibleProfileName(report.profile));
+        const visibleValidation = nextValidation.filter((profile) => visibleProfileName(profile.profile));
         const nextProfiles = await Promise.all(
-          nextProfileNames.map((name) => getProfile(root, name).catch((error) => {
+          visibleNames.map((name) => getProfile(root, name).catch((error) => {
             nextWarnings.push(`Profile ${name}: ${String(error)}`);
             return null;
           })),
         );
         if (!alive) return;
         setSkills(nextSkills);
-        setProfileNames(nextProfileNames);
-        setAudit(nextAudit);
-        setProfiles(nextProfiles.filter((profile): profile is ProfilePayload => profile !== null));
-        setHealth({ registry: nextRegistry, links: nextLinks, profiles: nextValidation });
+        setProfileNames(visibleNames);
+        setAudit(visibleAudit);
+        setAgentTargets(normalizeAgentTargets(nextAgents));
+        setProfiles(nextProfiles.filter((profile): profile is ProfilePayload => profile !== null && visibleProfileName(profile.name)));
+        setHighlightedProfile((current) => current && visibleNames.includes(current) ? current : null);
+        setHealth({ registry: nextRegistry, links: nextLinks, profiles: visibleValidation });
         setWarnings(nextWarnings);
       } catch (error) {
         if (alive) setFatalError(String(error));
@@ -111,7 +143,7 @@ export default function App() {
       }
     })();
     return () => { alive = false; };
-  }, [root]);
+  }, [root, reloadToken]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -147,6 +179,13 @@ export default function App() {
     setView(nextView);
     setPaletteOpen(false);
     setQuery("");
+    setHighlightedProfile(null);
+  };
+
+  const openProfile = (profile: string) => {
+    setView("agents");
+    setPaletteOpen(false);
+    setHighlightedProfile(profile);
   };
 
   if (fatalError) {
@@ -161,7 +200,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar view={view} profiles={profileNames} version={version} onNavigate={navigate} />
+      <Sidebar view={view} profiles={profileNames} version={version} onNavigate={navigate} onOpenProfile={openProfile} />
       <main className="content">
         <header className="topbar">
           <div>
@@ -189,7 +228,11 @@ export default function App() {
         ) : view === "library" ? (
           <LibraryView skills={skills} profiles={profileNames} audit={audit} onOpenSkill={openSkill} />
         ) : view === "agents" ? (
-          <AgentsView profiles={profiles} audit={audit} />
+          <AgentsView
+            profiles={highlightedProfile ? profiles.filter((profile) => profile.name === highlightedProfile) : profiles}
+            audit={audit}
+            selectedProfile={highlightedProfile}
+          />
         ) : (
           <DoctorView health={health} />
         )}
@@ -204,6 +247,21 @@ export default function App() {
           loading={detailLoading}
           warning={detailWarning}
           onClose={() => setSelectedSkill(null)}
+          onAssign={() => setAssignOpen(true)}
+        />
+      )}
+
+      {assignOpen && selectedSkill && root && (
+        <AssignDialog
+          root={root}
+          skill={selectedDetail ?? selectedSkill}
+          agentTargets={agentTargets}
+          existingProfiles={profiles}
+          onClose={() => setAssignOpen(false)}
+          onApplied={() => {
+            setAssignOpen(false);
+            setReloadToken((token) => token + 1);
+          }}
         />
       )}
 
@@ -222,11 +280,12 @@ export default function App() {
   );
 }
 
-function Sidebar({ view, profiles, version, onNavigate }: {
+function Sidebar({ view, profiles, version, onNavigate, onOpenProfile }: {
   view: View;
   profiles: string[];
   version: string;
   onNavigate: (view: View) => void;
+  onOpenProfile: (profile: string) => void;
 }) {
   return (
     <aside className="sidebar">
@@ -238,7 +297,7 @@ function Sidebar({ view, profiles, version, onNavigate }: {
       </nav>
       <div className="sidebar-heading">Profiles</div>
       <div className="profile-list">
-        {profiles.map((profile) => <span key={profile} className="profile-link">{profile}</span>)}
+        {profiles.map((profile) => <button key={profile} className="profile-link" aria-label={`打开 profile ${profile}`} onClick={() => onOpenProfile(profile)}>{profile}</button>)}
         {profiles.length === 0 && <span className="profile-link muted">暂无 profile</span>}
       </div>
       <div className="sidebar-footer mono">{version}</div>
@@ -277,16 +336,22 @@ function LibraryView({ skills, profiles, audit, onOpenSkill }: {
   );
 }
 
-function AgentsView({ profiles, audit }: { profiles: ProfilePayload[]; audit: AuditReport[] }) {
+function AgentsView({ profiles, audit, selectedProfile }: { profiles: ProfilePayload[]; audit: AuditReport[]; selectedProfile: string | null }) {
   if (profiles.length === 0) return <div className="empty-state">尚未创建 profile</div>;
   return (
     <section className="stack-list">
       {profiles.map((profile) => {
         const report = audit.find((item) => item.profile === profile.name);
         return (
-          <article className="panel" key={profile.name}>
+          <article
+            aria-label={`Profile ${profile.name}`}
+            className={`panel${selectedProfile === profile.name ? " highlighted" : ""}`}
+            data-highlighted={selectedProfile === profile.name ? "true" : "false"}
+            key={profile.name}
+          >
             <div className="panel-heading"><div><h2>{profile.name}</h2><span className="badge agent enabled">{profile.agent}</span></div><span>{profile.effective_skills.length} effective</span></div>
-            <div className="detail-section"><h3>Effective skills</h3><div className="badge-row">{profile.effective_skills.map((skill) => <span className="badge mono" key={skill}>{skill}</span>)}</div></div>
+            <div className="detail-section"><h3>Configured skills</h3><div className="badge-row">{profile.skills.length ? profile.skills.map((skill) => <span className="badge mono" key={skill}>{skill}</span>) : <span className="muted">无</span>}</div></div>
+            <div className="detail-section"><h3>Effective skills</h3><div className="badge-row">{profile.effective_skills.length ? profile.effective_skills.map((skill) => <span className="badge mono" key={skill}>{skill}</span>) : <span className="muted">无</span>}</div></div>
             <div className="detail-section"><h3>Exclude patterns</h3><div className="badge-row">{profile.exclude.length ? profile.exclude.map((item) => <span className="badge mono" key={item}>{item}</span>) : <span className="muted">无</span>}</div></div>
             {(report?.missing_skills.length ?? 0) > 0 && <div className="issue-list">{report?.missing_skills.map((item) => <span key={item}><AlertCircle size={14} />{item}</span>)}</div>}
           </article>
@@ -315,7 +380,7 @@ function DoctorView({ health }: { health: HealthState }) {
   );
 }
 
-function SkillDetails({ skill, content, source, profiles, loading, warning, onClose }: {
+function SkillDetails({ skill, content, source, profiles, loading, warning, onClose, onAssign }: {
   skill: RegistryEntry;
   content: string;
   source: SkillSourceRecord | null;
@@ -323,6 +388,7 @@ function SkillDetails({ skill, content, source, profiles, loading, warning, onCl
   loading: boolean;
   warning: string | null;
   onClose: () => void;
+  onAssign: () => void;
 }) {
   const [tab, setTab] = useState<DetailTab>("preview");
   const memberships = profiles.filter((profile) => profile.effective_skills.includes(skill.name));
@@ -330,6 +396,7 @@ function SkillDetails({ skill, content, source, profiles, loading, warning, onCl
     <aside className="details-panel" aria-label="Skill details">
       <div className="details-header"><div><span className="eyebrow">Skill details</span><h2 className="mono">{skill.name}</h2></div><button className="icon-button" aria-label="关闭详情" onClick={onClose}><X size={17} /></button></div>
       <p className="detail-description">{skill.description ?? "（无描述）"}</p>
+      <button className="assign-trigger" onClick={onAssign}><Users size={14} /> 分配给 Agent</button>
       <div className="detail-tabs" role="tablist" aria-label="Skill detail sections">
         <button role="tab" aria-selected={tab === "preview"} onClick={() => setTab("preview")}>预览</button>
         <button role="tab" aria-selected={tab === "source"} onClick={() => setTab("source")}>来源</button>
@@ -404,6 +471,118 @@ function CommandPalette({ root, initialSkills, query, onQuery, onNavigate, onOpe
         <div className="palette-input"><Search size={16} /><input autoFocus value={query} onChange={(event) => onQuery(event.target.value)} placeholder="搜索 skills 或输入命令…" /><kbd>esc</kbd></div>
         <div className="palette-group"><h3>导航</h3>{(["library", "agents", "doctor"] as View[]).map((item) => <button key={item} aria-label={`前往 ${item[0].toUpperCase()}${item.slice(1)}`} onClick={() => onNavigate(item)}><CommandIcon size={14} />前往 {item[0].toUpperCase()}{item.slice(1)}</button>)}</div>
         <div className="palette-group"><h3>Skills</h3>{matches.map((skill) => <button key={skill.name} onClick={() => onOpenSkill(skill)}><Library size={14} /><span><strong className="mono">{skill.name}</strong><small>{skill.description}</small></span></button>)}{searching && <p className="palette-empty">正在搜索…</p>}{!searching && searchError && <p className="palette-empty error">搜索失败：{searchError}</p>}{!searching && !searchError && matches.length === 0 && <p className="palette-empty">没有匹配的 skill</p>}</div>
+      </section>
+    </div>
+  );
+}
+
+function AssignDialog({ root, skill, agentTargets, existingProfiles, onClose, onApplied }: {
+  root: string;
+  skill: RegistryEntry;
+  agentTargets: AgentTarget[];
+  existingProfiles: ProfilePayload[];
+  onClose: () => void;
+  onApplied: () => void;
+}) {
+  const [selected, setSelected] = useState<string[]>([]);
+  const [previews, setPreviews] = useState<Record<string, SyncResultPayload>>({});
+  const [previewing, setPreviewing] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const toggleAgent = (agent: string) => {
+    setSelected((current) => current.includes(agent) ? current.filter((item) => item !== agent) : [...current, agent]);
+    setPreviews({});
+  };
+
+  const selectedTargets = agentTargets.filter((item) => selected.includes(item.agent));
+
+  const runPreview = async () => {
+    setPreviewing(true);
+    setError(null);
+    try {
+      const results: Record<string, SyncResultPayload> = {};
+      for (const item of selectedTargets) {
+        const existing = existingProfiles.find((profile) => profile.name === item.agent);
+        const pendingSkill = !existing || !existing.skills.includes(skill.name);
+        results[item.agent] = await dryRunSync(root, item.target, item.agent, { addSkills: pendingSkill ? [skill.name] : [], agent: item.agent });
+      }
+      setPreviews(results);
+    } catch (err) {
+      setError(String(err));
+      setPreviews({});
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const runApply = async () => {
+    setApplying(true);
+    setError(null);
+    try {
+      for (const item of selectedTargets) {
+        const existing = existingProfiles.find((profile) => profile.name === item.agent);
+        const pendingSkill = !existing || !existing.skills.includes(skill.name);
+        if (!existing) {
+          await createProfile(root, item.agent, item.agent, [skill.name]);
+        } else if (pendingSkill) {
+          await updateProfile(root, item.agent, { addSkills: [skill.name] });
+        }
+        await applySync(root, item.target, item.agent);
+      }
+      onApplied();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  return (
+    <div className="palette-backdrop" onMouseDown={onClose}>
+      <section className="assign-dialog" role="dialog" aria-label="分配给 Agent" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="details-header">
+          <div><span className="eyebrow">Assign skill</span><h2 className="mono">{skill.name}</h2></div>
+          <button className="icon-button" aria-label="关闭" onClick={onClose}><X size={17} /></button>
+        </div>
+        <label className="field-label">目标 Agent（可多选）</label>
+        <div className="agent-picker" role="group" aria-label="目标 Agent">
+          {agentTargets.map((item) => (
+            <label key={item.agent} className={`agent-option ${selected.includes(item.agent) ? "checked" : ""}`}>
+              <input
+                type="checkbox"
+                aria-label={item.agent}
+                checked={selected.includes(item.agent)}
+                onChange={() => toggleAgent(item.agent)}
+              />
+              <span className="mono">{item.agent}</span>
+              <small>{item.target}</small>
+            </label>
+          ))}
+          {agentTargets.length === 0 && <p className="muted">未检测到 Agent</p>}
+        </div>
+        <div className="dialog-body">
+          {selectedTargets.length > 0 && <p className="muted">将写入 {selectedTargets.length} 个 profile 并同步到 {selectedTargets.map((item) => item.agent).join("、")}</p>}
+          {Object.entries(previews).map(([agent, preview]) => (
+            <div className="preview-summary" role="status" key={agent}>
+              <p className="status-ok"><CheckCircle2 size={14} /> {agent} 预览就绪（dry-run，未写入任何文件）</p>
+              <p className="preview-line">将链接 {preview.linked.length} 个 skill{preview.missing.length > 0 ? `，${preview.missing.length} 个缺失` : ""}{preview.removed.length > 0 ? `，将移除 ${preview.removed.length} 个链接` : ""}</p>
+              {preview.linked.length > 0 && <div className="badge-row">{preview.linked.map((name) => <span key={name} className="badge mono">{name}</span>)}</div>}
+              {preview.missing.length > 0 && <p className="status-bad">缺失：{preview.missing.join("、")}</p>}
+              {preview.removed.length > 0 && <p className="status-bad">将移除：{preview.removed.join("、")}</p>}
+            </div>
+          ))}
+        </div>
+        {error && <div className="detail-warning"><AlertCircle size={14} />{error}</div>}
+        <div className="dialog-actions">
+          <button onClick={onClose}>取消</button>
+          <button className="secondary" disabled={selectedTargets.length === 0 || previewing} onClick={() => { void runPreview(); }}>
+            {previewing ? "预览中…" : "预览同步"}
+          </button>
+          <button className="primary" disabled={selectedTargets.length === 0 || applying || Object.keys(previews).length === 0} onClick={() => { void runApply(); }}>
+            {applying ? "同步中…" : "确认分配并同步"}
+          </button>
+        </div>
       </section>
     </div>
   );

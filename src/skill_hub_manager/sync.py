@@ -15,13 +15,15 @@ class SyncResult:
 
 
 def sync_profile(profile: Profile, skills: dict[str, Skill], target: Path, dry_run: bool = False) -> SyncResult:
-    target.mkdir(parents=True, exist_ok=True)
+    if not dry_run:
+        target.mkdir(parents=True, exist_ok=True)
     linked: list[str] = []
     missing: list[str] = []
     removed: list[str] = []
     desired_skills = profile.effective_skills()
     desired = set(desired_skills)
-    for child in sorted(target.iterdir()):
+    children = sorted(target.iterdir()) if target.exists() else []
+    for child in children:
         if child.name in desired:
             continue
         if child.is_symlink():

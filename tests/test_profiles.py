@@ -80,6 +80,17 @@ class ProfileTests(unittest.TestCase):
 
         self.assertEqual([path.name for path in profiles], ["alpha.yaml", "zebra.yaml"])
 
+    def test_list_profiles_excludes_only_reserved_all_agent_profile(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            profiles_dir = Path(temp_dir)
+            (profiles_dir / "all-agent.yaml").write_text("name: all-agent\nagent: codex\nskills:\n", encoding="utf-8")
+            (profiles_dir / "all-agent-extra.yaml").write_text("name: all-agent-extra\nagent: codex\nskills:\n", encoding="utf-8")
+            (profiles_dir / "codex.yaml").write_text("name: codex\nagent: codex\nskills:\n", encoding="utf-8")
+
+            profiles = list_profiles(profiles_dir)
+
+        self.assertEqual([path.name for path in profiles], ["all-agent-extra.yaml", "codex.yaml"])
+
     def test_write_profile_persists_deterministic_yaml(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             profiles_dir = Path(temp_dir)

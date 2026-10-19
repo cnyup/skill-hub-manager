@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from skill_hub_manager import __version__
-from skill_hub_manager.agents import detect_agent_target
+from skill_hub_manager.agents import detect_agent_target, list_agent_targets
 from skill_hub_manager.audit import audit_profiles, render_audit_json
 from skill_hub_manager.doctor import find_broken_links, find_missing_expected_links, load_sync_target
 from skill_hub_manager.install_state import (
@@ -59,6 +59,10 @@ def build_parser() -> argparse.ArgumentParser:
     agent = subparsers.add_parser("agent")
     agent_subparsers = agent.add_subparsers(dest="agent_command")
 
+    agent_list = agent_subparsers.add_parser("list")
+    agent_list.add_argument("--root")
+    agent_list.add_argument("--json", action="store_true")
+
     agent_detect = agent_subparsers.add_parser("detect")
     agent_detect.add_argument("--root", required=True)
     agent_detect.add_argument("--agent")
@@ -102,9 +106,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     sync = subparsers.add_parser("sync")
     sync.add_argument("--vault")
-    sync.add_argument("--profile")
+    sync.add_argument("--profile", help="profile YAML path (legacy explicit-path form)")
+    sync.add_argument("--profile-name", help="profile name under <root>/profiles")
     sync.add_argument("--root")
     sync.add_argument("--target", required=True)
+    sync.add_argument("--add-skill", action="append", default=[])
+    sync.add_argument("--remove-skill", action="append", default=[])
+    sync.add_argument("--candidate-agent", help="agent for an unpersisted candidate profile; dry-run only")
     sync.add_argument("--dry-run", action="store_true")
     sync.add_argument("--json", action="store_true")
 
@@ -231,6 +239,20 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _cmd_agent_list(args: argparse.Namespace) -> int:
+    root = resolve_workspace_root(_optional_path(args.root))
+    agents = [
+        {"agent": agent, "target": str(target)}
+        for agent, target in sorted(list_agent_targets(root).items())
+    ]
+    if args.json:
+        print(json.dumps({"agents": agents}, indent=2))
+        return 0
+    for item in agents:
+        print(f"{item['agent']}: {item['target']}")
+    return 0
+
+
 def _cmd_agent_detect(args: argparse.Namespace) -> int:
     root = resolve_workspace_root(_optional_path(args.root))
     result = detect_agent_target(root=root, agent_hint=args.agent)
@@ -332,7 +354,26 @@ def _cmd_registry_doctor(args: argparse.Namespace) -> int:
 
 def _cmd_sync(args: argparse.Namespace) -> int:
     vault, profile_path = _resolve_sync_paths(args)
-    profile = load_profile(profile_path)
+    has_candidate_changes = bool(args.add_skill or args.remove_skill or args.candidate_agent)
+    if has_candidate_changes and not args.dry_run:
+        message = "--add-skill/--remove-skill/--candidate-agent require --dry-run; persist profile changes after confirmation"
+        if args.json:
+            print(json.dumps({"error": message}, indent=2))
+        else:
+            print(message)
+        return 2
+    if profile_path.is_file():
+        profile = load_profile(profile_path)
+    elif args.candidate_agent and args.profile_name:
+        profile = Profile(name=args.profile_name, agent=args.candidate_agent, skills=[])
+    else:
+        profile = load_profile(profile_path)
+    if has_candidate_changes:
+        profile = update_profile(
+            profile,
+            add_skills=args.add_skill,
+            remove_skills=args.remove_skill,
+        )
     target = Path(args.target)
     result = sync_profile(profile, scan_skills(vault), target, dry_run=args.dry_run)
     if args.root and not args.dry_run:
@@ -871,6 +912,7 @@ def _cmd_profile_validate(args: argparse.Namespace) -> int:
 
 
 _DISPATCH: dict[tuple[str, str | None], callable] = {
+    ("agent", "list"): _cmd_agent_list,
     ("agent", "detect"): _cmd_agent_detect,
     ("scan", None): _cmd_scan,
     ("ls", None): _cmd_ls,
@@ -949,11 +991,18 @@ def _resolve_registry_paths(args: argparse.Namespace) -> tuple[Path, Path]:
 
 
 def _resolve_sync_paths(args: argparse.Namespace) -> tuple[Path, Path]:
-    if args.vault and args.profile:
+    if args.profile and args.profile_name:
+        raise ValueError("use either --profile or --profile-name, not both")
+    if args.vault and args.profile and not args.root:
         return Path(args.vault), Path(args.profile)
     paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
     vault = Path(args.vault) if args.vault else paths.skills
-    profile = Path(args.profile) if args.profile else paths.profiles / "default.yaml"
+    if args.profile:
+        profile = Path(args.profile)
+    elif args.profile_name:
+        profile = paths.profiles / f"{args.profile_name}.yaml"
+    else:
+        profile = paths.profiles / "default.yaml"
     return vault, profile
 
 

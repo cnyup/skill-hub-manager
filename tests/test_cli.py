@@ -429,6 +429,119 @@ class CliTests(unittest.TestCase):
             self.assertIn("would-link: k8s-finder", output.getvalue())
             self.assertIn("would-remove: old-skill", output.getvalue())
 
+    def test_sync_command_candidate_add_skill_dry_run_does_not_write_profile_links_or_state(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            current = root / "skills" / "current-skill"
+            candidate = root / "skills" / "candidate-skill"
+            current.mkdir(parents=True)
+            candidate.mkdir(parents=True)
+            (current / "SKILL.md").write_text("# current", encoding="utf-8")
+            (candidate / "SKILL.md").write_text("# candidate", encoding="utf-8")
+            profile = root / "profiles" / "codex.yaml"
+            profile.parent.mkdir(parents=True)
+            profile.write_text(
+                "name: codex\nagent: codex\nskills:\n  - current-skill\n",
+                encoding="utf-8",
+            )
+            before_profile = profile.read_bytes()
+            target = Path(temp_dir) / "target"
+            target.mkdir()
+            (target / "current-skill").symlink_to(current, target_is_directory=True)
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "sync", "--root", str(root), "--profile-name", "codex",
+                        "--target", str(target), "--add-skill", "candidate-skill",
+                        "--dry-run", "--json",
+                    ]
+                )
+
+            payload = json.loads(output.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["mode"], "dry-run")
+            self.assertEqual(payload["profile"], "codex")
+            self.assertEqual(payload["linked"], ["current-skill", "candidate-skill"])
+            self.assertEqual(profile.read_bytes(), before_profile)
+            self.assertFalse((target / "candidate-skill").exists())
+            self.assertTrue((target / "current-skill").is_symlink())
+            self.assertFalse((root / "state" / "last-sync.json").exists())
+
+    def test_sync_command_candidate_add_skill_dry_run_does_not_create_missing_target(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            skill = root / "skills" / "candidate-skill"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("# candidate", encoding="utf-8")
+            profile = root / "profiles" / "codex.yaml"
+            profile.parent.mkdir(parents=True)
+            profile.write_text("name: codex\nagent: codex\nskills:\n", encoding="utf-8")
+            target = Path(temp_dir) / "missing-target"
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                exit_code = main(
+                    [
+                        "sync", "--root", str(root), "--profile-name", "codex",
+                        "--target", str(target), "--add-skill", "candidate-skill",
+                        "--dry-run", "--json",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertFalse(target.exists())
+
+    def test_sync_command_can_preview_an_unpersisted_candidate_profile(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            skill = root / "skills" / "candidate-skill"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("# candidate", encoding="utf-8")
+            target = Path(temp_dir) / "target"
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "sync", "--root", str(root), "--profile-name", "claude",
+                        "--candidate-agent", "claude", "--target", str(target),
+                        "--add-skill", "candidate-skill", "--dry-run", "--json",
+                    ]
+                )
+
+            payload = json.loads(output.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["profile"], "claude")
+            self.assertEqual(payload["agent"], "claude")
+            self.assertEqual(payload["linked"], ["candidate-skill"])
+            self.assertFalse((root / "profiles" / "claude.yaml").exists())
+            self.assertFalse(target.exists())
+
+    def test_sync_command_candidate_changes_require_dry_run(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            skill = root / "skills" / "candidate-skill"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("# candidate", encoding="utf-8")
+            profile = root / "profiles" / "codex.yaml"
+            profile.parent.mkdir(parents=True)
+            profile.write_text("name: codex\nagent: codex\nskills:\n", encoding="utf-8")
+            target = Path(temp_dir) / "target"
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "sync", "--root", str(root), "--profile-name", "codex",
+                        "--target", str(target), "--add-skill", "candidate-skill", "--json",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 2)
+            self.assertIn("require --dry-run", json.loads(output.getvalue())["error"])
+            self.assertFalse(target.exists())
+
     def test_sync_command_json_outputs_machine_readable_apply_result(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "workspace"

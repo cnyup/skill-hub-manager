@@ -100,7 +100,29 @@ export interface ProfileValidation {
   issues: string[];
 }
 
+export interface AgentTarget {
+  agent: string;
+  target: string;
+}
+
 export type SkillSourceRecord = Record<string, string>;
+
+const RESERVED_PROFILE_NAMES = new Set(["all-agent"]);
+
+function canonicalAgentName(agent: string): string {
+  return agent === "claude-code" ? "claude" : agent;
+}
+
+function normalizeAgentTargets(targets: AgentTarget[]): AgentTarget[] {
+  const normalized = new Map<string, AgentTarget>();
+  for (const target of targets) {
+    const agent = canonicalAgentName(target.agent);
+    if (!normalized.has(agent) || target.agent === agent) {
+      normalized.set(agent, { ...target, agent });
+    }
+  }
+  return [...normalized.values()];
+}
 
 /** Resolve the active workspace, keeping compatibility with the pre-standard ~/skills-hub location. */
 export async function resolveWorkspaceRoot(): Promise<string> {
@@ -117,6 +139,13 @@ export async function resolveWorkspaceRoot(): Promise<string> {
 }
 
 // ---------- 只读 API ----------
+
+export async function listAgentTargets(root: string): Promise<AgentTarget[]> {
+  const { data } = await runCliJson<{ agents: AgentTarget[] }>([
+    "agent", "list", "--root", root, "--json",
+  ]);
+  return normalizeAgentTargets(data.agents);
+}
 
 export async function listSkills(root: string): Promise<RegistryEntry[]> {
   const { data } = await runCliJson<{ skills: RegistryEntry[] }>([
@@ -164,7 +193,7 @@ export async function listProfiles(root: string): Promise<string[]> {
   const { data } = await runCliJson<{ profiles: string[] }>([
     "profile", "list", "--root", root, "--json",
   ]);
-  return data.profiles;
+  return data.profiles.filter((profile) => !RESERVED_PROFILE_NAMES.has(profile));
 }
 
 export async function auditAll(root: string): Promise<AuditReport[]> {
@@ -196,6 +225,19 @@ export async function doctor(
 
 // ---------- 写 API ----------
 
+export async function createProfile(
+  root: string,
+  name: string,
+  agent: string,
+  skills: string[],
+): Promise<{ written: string }> {
+  const args = ["profile", "add", "--root", root, "--name", name, "--agent", agent];
+  for (const skill of skills) args.push("--skill", skill);
+  args.push("--json");
+  const { data } = await runCliJson<{ written: string }>(args);
+  return data;
+}
+
 export async function updateProfile(
   root: string,
   name: string,
@@ -212,10 +254,14 @@ export async function updateProfile(
 export async function dryRunSync(
   root: string,
   target: string,
-  profile?: string,
+  profileName?: string,
+  candidate?: { addSkills?: string[]; removeSkills?: string[]; agent?: string },
 ): Promise<SyncResultPayload> {
   const args = ["sync", "--root", root, "--target", target, "--dry-run", "--json"];
-  if (profile) args.push("--profile", profile);
+  if (profileName) args.push("--profile-name", profileName);
+  if (candidate?.agent) args.push("--candidate-agent", candidate.agent);
+  for (const skill of candidate?.addSkills ?? []) args.push("--add-skill", skill);
+  for (const skill of candidate?.removeSkills ?? []) args.push("--remove-skill", skill);
   const { data } = await runCliJson<SyncResultPayload>(args);
   return data;
 }
@@ -223,10 +269,10 @@ export async function dryRunSync(
 export async function applySync(
   root: string,
   target: string,
-  profile?: string,
+  profileName?: string,
 ): Promise<SyncResultPayload> {
   const args = ["sync", "--root", root, "--target", target, "--json"];
-  if (profile) args.push("--profile", profile);
+  if (profileName) args.push("--profile-name", profileName);
   const { data } = await runCliJson<SyncResultPayload>(args);
   return data;
 }

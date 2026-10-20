@@ -186,6 +186,45 @@ Notes:
 - `updated_profiles` lists profiles that contained the skill and were modified
 - The registry is always rebuilt after a successful removal
 
+## `skill import --json`
+
+Command:
+
+```bash
+skill-hub skill import --root <path> --source <dir> [--name <skill>] [--force] --json
+```
+
+Shape (success):
+
+```json
+{
+  "skill": "web-access",
+  "source": "/path/to/incoming/web-access",
+  "target": "/path/to/workspace/skills/web-access",
+  "replaced": false,
+  "state_file": "/path/to/workspace/state/skill-sources.json"
+}
+```
+
+Shape (error, exit 1):
+
+```json
+{
+  "skill": "web-access",
+  "source": "/path/to/incoming/web-access",
+  "target": "/path/to/workspace/skills/web-access",
+  "replaced": false,
+  "state_file": "/path/to/workspace/state/skill-sources.json",
+  "error": "exists: /path/to/workspace/skills/web-access"
+}
+```
+
+Notes:
+
+- `replaced` is `true` only when `--force` overwrote an existing skill
+- On error the payload carries an `error` field and the exit code is 1
+- A successful import writes or updates the source record in `state_file`
+
 ## `skill update --json`
 
 Command:

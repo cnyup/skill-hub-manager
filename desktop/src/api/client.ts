@@ -7,6 +7,7 @@
  * - Rust 侧 tauri-plugin-shell scope 白名单仅放行 skill-hub 包装器。
  */
 import { homeDir } from "@tauri-apps/api/path";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { Command } from "@tauri-apps/plugin-shell";
 
 export class CliError extends Error {
@@ -225,6 +226,11 @@ export async function doctor(
 
 // ---------- 写 API ----------
 
+/** 打开系统目录选择弹窗；用户取消时返回 null。仅桌面端可用（jsdom 测试中 mock）。 */
+export async function pickDirectory(): Promise<string | null> {
+  return openDialog({ directory: true, multiple: false, title: "选择 skill 来源目录" });
+}
+
 export async function createProfile(
   root: string,
   name: string,
@@ -275,4 +281,67 @@ export async function applySync(
   if (profileName) args.push("--profile-name", profileName);
   const { data } = await runCliJson<SyncResultPayload>(args);
   return data;
+}
+
+// ---------- Skill 生命周期（对齐 CLI skill import/remove/update --json 契约） ----------
+
+export interface SkillImportResult {
+  skill: string;
+  source: string;
+  target: string;
+  replaced: boolean;
+  state_file: string;
+}
+
+export interface SkillUpdateResult {
+  skill: string;
+  source: string;
+  target: string;
+  replaced: boolean;
+}
+
+export interface SkillRemoveResult {
+  skill: string;
+  target: string;
+  removed: boolean;
+  purged_source: boolean;
+  updated_profiles: string[];
+}
+
+/** 生命周期命令约定：非零退出码时 stdout 仍带 JSON（含 error 字段），此时抛错并携带 error 文本。 */
+async function runLifecycleCommand<T>(args: string[]): Promise<T> {
+  const { data, exitCode } = await runCliJson<T & { error?: string }>(args);
+  if (exitCode !== 0) {
+    const detail = data?.error ?? `exit ${exitCode}`;
+    throw new CliError(exitCode, detail, `skill-hub ${args.slice(0, 4).join(" ")} 失败：${detail}`);
+  }
+  return data;
+}
+
+export async function importSkill(
+  root: string,
+  options: { source: string; name?: string; force?: boolean },
+): Promise<SkillImportResult> {
+  const args = ["skill", "import", "--root", root, "--source", options.source];
+  if (options.name) args.push("--name", options.name);
+  if (options.force) args.push("--force");
+  args.push("--json");
+  return runLifecycleCommand<SkillImportResult>(args);
+}
+
+export async function updateSkill(root: string, name: string): Promise<SkillUpdateResult> {
+  return runLifecycleCommand<SkillUpdateResult>([
+    "skill", "update", "--root", root, "--name", name, "--json",
+  ]);
+}
+
+export async function removeSkill(
+  root: string,
+  name: string,
+  options?: { purgeSource?: boolean },
+): Promise<SkillRemoveResult> {
+  const args = ["skill", "remove", "--root", root, "--name", name];
+  if (options?.purgeSource) args.push("--purge-source");
+  args.push("--json");
+  return runLifecycleCommand<SkillRemoveResult>(args);
 }

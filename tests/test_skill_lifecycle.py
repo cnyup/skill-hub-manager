@@ -55,6 +55,53 @@ class SkillRemoveTests(unittest.TestCase):
             self.assertEqual(exit_code, 1)
             self.assertIn("missing: nonexistent", output.getvalue())
 
+    def test_skill_remove_ghost_record_cleans_registry_and_references(self):
+        """幽灵 skill：registry/source 记录还在但 vault 目录已被外部删除。
+
+        remove 应清理 registry、profile 引用与来源记录并返回 0（幂等清理），
+        而不是撞 FileNotFoundError 或报 missing 后留下脏记录。
+        """
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "workspace"
+            (root / "skills").mkdir(parents=True)
+            (root / "state").mkdir()
+            # registry 里登记了已消失的 skill
+            (root / "state" / "registry.yaml").write_text(
+                "skills:\n  ghost-skill:\n    path: nowhere\n",
+                encoding="utf-8",
+            )
+            # source 记录还在
+            (root / "state" / "skill-sources.json").write_text(
+                json.dumps({"records": [{"skill": "ghost-skill", "source": "/gone", "stored_path": "/gone/vault"}]}),
+                encoding="utf-8",
+            )
+            # 一个 profile 还引用它
+            (root / "profiles").mkdir()
+            (root / "profiles" / "default.yaml").write_text(
+                "name: default\nagent: codex\nskills:\n  - ghost-skill\n",
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main([
+                    "skill", "remove", "--root", str(root), "--name", "ghost-skill",
+                    "--purge-source", "--json",
+                ])
+
+            payload = json.loads(output.getvalue())
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(payload["skill"], "ghost-skill")
+            self.assertFalse(payload["removed"])  # vault 里本来就不存在
+            self.assertTrue(payload["purged_source"])
+            self.assertEqual(payload["updated_profiles"], ["default"])
+            # source 记录已清空
+            records = json.loads((root / "state" / "skill-sources.json").read_text(encoding="utf-8"))
+            self.assertEqual(records["records"], [])
+            # profile 已移除引用
+            profile_text = (root / "profiles" / "default.yaml").read_text(encoding="utf-8")
+            self.assertNotIn("ghost-skill", profile_text)
+
     def test_skill_remove_purges_source_record(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "workspace"

@@ -17,3 +17,13 @@
 .preview-summary{margin-top:8px;padding:10px;border:1px solid var(--blue-border);border-radius:8px;background:var(--blue-bg);font-size:12px}.preview-summary p{display:flex;align-items:center;gap:6px;margin:0}.preview-summary .badge-row{margin-top:8px}
 .dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}.dialog-actions button{padding:7px 13px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer}.dialog-actions button:disabled{opacity:.45;cursor:not-allowed}.dialog-actions .secondary:hover:not(:disabled){background:var(--subtle)}.dialog-actions .primary{border-color:var(--blue);background:var(--blue);color:#fff;font-weight:600}.dialog-actions .primary:hover:not(:disabled){background:#1e40af}
 @media(max-width:1050px){.details-panel{position:fixed;right:0;top:0;bottom:0;z-index:10;box-shadow:-12px 0 28px rgba(24,24,27,.08)}}
+.topbar-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.import-trigger{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-size:13px;white-space:nowrap}.import-trigger:hover{border-color:#a1a1aa;background:var(--subtle)}
+.text-input{width:100%;padding:8px 9px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13px}
+.detail-actions{display:flex;flex-direction:column;gap:6px;margin:8px 0}
+.lifecycle-trigger{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-size:13px}.lifecycle-trigger:hover{border-color:#a1a1aa;background:var(--subtle)}.lifecycle-trigger.danger{color:#b91c1c;border-color:#fca5a5}.lifecycle-trigger.danger:hover{background:#fef2f2;border-color:#ef4444}
+.toast-banner{margin-bottom:10px;padding:9px 12px;border:1px solid #bbf7d0;border-radius:8px;background:#f0fdf4;color:#166534;font-size:13px;cursor:pointer}
+.source-input-row{display:flex;gap:8px;width:100%}
+.source-input-row .text-input{flex:1;min-width:0}
+.browse-button{white-space:nowrap;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;font-size:13px}
+.browse-button:hover{border-color:#a1a1aa;background:var(--subtle)}

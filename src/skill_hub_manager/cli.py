@@ -605,7 +605,7 @@ def _cmd_skill_import(args: argparse.Namespace) -> int:
 def _cmd_skill_remove(args: argparse.Namespace) -> int:
     paths = workspace_paths(resolve_workspace_root(_optional_path(args.root)))
     result = remove_skill_directory(paths.skills, args.name)
-    if not result.removed:
+    if not result.removed and not (args.purge_source or _skill_has_stale_records(paths, args.name)):
         if args.json:
             print(
                 json.dumps(
@@ -639,7 +639,7 @@ def _cmd_skill_remove(args: argparse.Namespace) -> int:
                 {
                     "skill": args.name,
                     "target": str(result.target),
-                    "removed": True,
+                    "removed": result.removed,
                     "purged_source": args.purge_source,
                     "updated_profiles": updated_profiles,
                 },
@@ -652,6 +652,18 @@ def _cmd_skill_remove(args: argparse.Namespace) -> int:
         print(f"updated_profiles: {', '.join(updated_profiles)}")
     print("rebuilt: registry")
     return 0
+
+
+def _skill_has_stale_records(paths, name: str) -> bool:
+    """vault 目录已消失时，判断是否仍有状态记录引用该 skill（幽灵注册）。"""
+    source_state_path = paths.state / "skill-sources.json"
+    if find_source_record(load_source_records(source_state_path), name) is not None:
+        return True
+    profiles_dir = paths.profiles
+    for profile_path in list_profiles(profiles_dir):
+        if name in load_profile(profile_path).skills:
+            return True
+    return False
 
 
 def _cmd_skill_update(args: argparse.Namespace) -> int:

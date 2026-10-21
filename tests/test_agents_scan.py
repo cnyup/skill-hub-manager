@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from skill_hub_manager.fsutil import atomic_write_text
+from skill_hub_manager.state_io import atomic_write_text
 from skill_hub_manager.profiles import load_profile
 from skill_hub_manager.agents import (
     canonical_agent_name,

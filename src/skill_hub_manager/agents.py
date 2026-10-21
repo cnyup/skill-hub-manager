@@ -4,8 +4,10 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from skill_hub_manager.fsutil import atomic_write_text
 from skill_hub_manager.install_state import find_install_record, load_install_records
 from skill_hub_manager.paths import install_state_file
+from skill_hub_manager.profiles import load_profile
 
 
 # Built-in defaults — can be extended or overridden via ~/.skill-hub/agents.yaml
@@ -15,6 +17,19 @@ _DEFAULT_TARGETS: dict[str, Path] = {
     "claude": Path.home() / ".claude" / "skills",
     "cursor": Path.home() / ".cursor" / "skills",
     "windsurf": Path.home() / ".codeium" / "windsurf" / "skills",
+}
+
+# Scan candidates for local agent discovery (Wave 6). Data table, not logic —
+# adding a new agent only touches this mapping. skill-hub is the single shared
+# manager; third-party common areas (e.g. ~/.agents/skills) are intentionally
+# not scanned.
+SCAN_CANDIDATES: dict[str, Path] = {
+    **_DEFAULT_TARGETS,
+    "opencode": Path.home() / ".config" / "opencode" / "skills",
+    "zcode": Path.home() / ".zcode" / "skills",
+    "qoder": Path.home() / ".qoder" / "skills",
+    "workbuddy": Path.home() / ".workbuddy-ai" / "skills",
+    "tianshuharness": Path.home() / ".rivet" / "skills",
 }
 
 _AGENT_ALIASES = {"claude-code": "claude"}
@@ -78,6 +93,111 @@ class DetectionResult:
     confidence: str
     target_dir: Path | None
     reason: str
+
+
+@dataclass(frozen=True)
+class ScanCandidate:
+    """One scan-candidate agent and its local discovery state."""
+
+    agent: str
+    path: Path
+    exists: bool
+    skill_count: int
+    managed: bool
+
+
+def scan_local_agents(workspace_root: Path | None = None) -> list[ScanCandidate]:
+    """Probe the built-in scan table against the local filesystem.
+
+    exists/skill_count reflect the on-disk state; managed marks agents already
+    known to skill-hub (built-ins plus workspace agents.yaml entries).
+    """
+    managed = load_builtin_targets(workspace_root)
+    out: list[ScanCandidate] = []
+    for agent, path in SCAN_CANDIDATES.items():
+        canonical = canonical_agent_name(agent)
+        exists = path.is_dir()
+        out.append(
+            ScanCandidate(
+                agent=canonical,
+                path=path,
+                exists=exists,
+                skill_count=sum(1 for _ in path.glob("*/SKILL.md")) if exists else 0,
+                managed=canonical in managed,
+            )
+        )
+    return out
+
+
+def add_agent_target(workspace_root: Path, agent: str, target: Path) -> Path:
+    """Register (or update) an agent target in the workspace agents.yaml.
+
+    Writes are atomic; comments and unrelated entries are preserved. Returns
+    the config file path.
+    """
+    canonical = canonical_agent_name(agent)
+    config = workspace_root / "agents.yaml"
+    lines: list[str] = []
+    if config.is_file():
+        for raw in config.read_text(encoding="utf-8").splitlines():
+            stripped = raw.strip()
+            if stripped and not stripped.startswith("#") and ":" in stripped:
+                if stripped.split(":", 1)[0].strip() == canonical:
+                    continue  # drop the old entry for this agent; re-append below
+            lines.append(raw)
+    lines.append(f"{canonical}: {target.expanduser()}")
+    atomic_write_text(config, "\n".join(lines) + "\n")
+    return config
+
+
+def remove_agent_target(workspace_root: Path, agent: str) -> bool:
+    """Unregister an agent target from the workspace agents.yaml.
+
+    Built-in agents cannot be removed (they are code defaults). Returns True
+    when an entry was actually dropped; False for built-ins and missing
+    entries (idempotent no-op).
+    """
+    canonical = canonical_agent_name(agent)
+    if canonical in _DEFAULT_TARGETS:
+        return False
+    config = workspace_root / "agents.yaml"
+    if not config.is_file():
+        return False
+    kept: list[str] = []
+    removed = False
+    for raw in config.read_text(encoding="utf-8").splitlines():
+        stripped = raw.strip()
+        if stripped and not stripped.startswith("#") and ":" in stripped:
+            if stripped.split(":", 1)[0].strip() == canonical:
+                removed = True
+                continue  # drop this entry
+        kept.append(raw)
+    if not removed:
+        return False
+    atomic_write_text(config, "\n".join(kept).rstrip("\n") + ("\n" if kept else ""))
+    _remove_agent_profiles(workspace_root, canonical)
+    return True
+
+
+def _remove_agent_profiles(workspace_root: Path, canonical_agent: str) -> list[str]:
+    """Delete profile YAMLs belonging to the removed agent; return removed names.
+
+    Without this cascade the Library badges (audit), the Agents panel and the
+    sidebar Profiles list keep showing the removed agent.
+    """
+    profiles_dir = workspace_root / "profiles"
+    if not profiles_dir.is_dir():
+        return []
+    dropped: list[str] = []
+    for profile_path in sorted(profiles_dir.glob("*.yaml")):
+        try:
+            profile = load_profile(profile_path)
+        except (OSError, ValueError):
+            continue
+        if canonical_agent_name(profile.agent) == canonical_agent:
+            profile_path.unlink()
+            dropped.append(profile.name)
+    return dropped
 
 
 def detect_agent_target(root: Path, agent_hint: str | None) -> DetectionResult:

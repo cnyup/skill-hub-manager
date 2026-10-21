@@ -29,6 +29,9 @@ vi.mock("./api/client", async () => {
     updateSkill: vi.fn(),
     removeSkill: vi.fn(),
     pickDirectory: vi.fn(),
+    scanLocalAgents: vi.fn(),
+    addAgent: vi.fn(),
+    removeAgent: vi.fn(),
   };
 });
 
@@ -159,7 +162,8 @@ describe("Wave 3 desktop shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "打开 profile codex" }));
 
-    const codexCard = await screen.findByRole("article", { name: "Profile codex" });
+    // Agents 页按纳管 agent 渲染卡片；点击侧栏 profile 后只显示其所属 agent 的卡片
+    const codexCard = await screen.findByRole("article", { name: "Agent codex" });
     expect(codexCard).toHaveTextContent("Configured skills");
     expect(codexCard).toHaveTextContent("experimental-k8s");
     expect(codexCard).toHaveTextContent("Effective skills");
@@ -191,7 +195,7 @@ describe("Wave 3 desktop shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Agents" }));
     expect(screen.queryByRole("heading", { name: "all-agent" })).not.toBeInTheDocument();
-    expect(await screen.findByRole("heading", { name: "all-agent-extra" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "codex" })).toBeInTheDocument();
   });
 
   it("deduplicates claude-code into the canonical claude assignment target", async () => {
@@ -513,6 +517,93 @@ describe("Wave 5 skill lifecycle", () => {
   });
 });
 
+describe("Wave 6 scan local agents", () => {
+  it("scans, lists found unmanaged candidates and registers the selected one", async () => {
+    mocked.scanLocalAgents.mockResolvedValue([
+      { agent: "codex", target: "/Users/test/.codex/skills", exists: true, skill_count: 3, managed: true },
+      { agent: "zcode", target: "/Users/test/.zcode/skills", exists: true, skill_count: 5, managed: false },
+      { agent: "qoder", target: "/Users/test/.qoder/skills", exists: false, skill_count: 0, managed: false },
+    ]);
+    mocked.addAgent.mockResolvedValue({ agent: "zcode", target: "/Users/test/.zcode/skills", config: "/Users/test/.skill-hub/agents.yaml" });
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Agents" }));
+    fireEvent.click(await screen.findByRole("button", { name: "扫描本机 Agent" }));
+
+    const dialog = screen.getByRole("dialog", { name: "扫描本机 Agent" });
+    // 存在且未纳管的候选才出现；已纳管/不存在的被过滤
+    expect(await within(dialog).findByRole("checkbox", { name: "zcode" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("checkbox", { name: "codex" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("checkbox", { name: "qoder" })).not.toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: "zcode" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "确认纳管" }));
+
+    await waitFor(() => expect(mocked.addAgent).toHaveBeenCalledWith("/Users/test/.skill-hub", "zcode", "/Users/test/.zcode/skills"));
+    await waitFor(() => expect(mocked.listAgentTargets).toHaveBeenCalledTimes(2)); // 初始 + 纳管后刷新
+  });
+
+  it("adds a custom agent via the manual fallback form", async () => {
+    mocked.scanLocalAgents.mockResolvedValue([
+      { agent: "codex", target: "/Users/test/.codex/skills", exists: true, skill_count: 3, managed: true },
+    ]);
+    mocked.addAgent.mockResolvedValue({ agent: "my-agent", target: "/Users/test/my-skills", config: "/Users/test/.skill-hub/agents.yaml" });
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Agents" }));
+    fireEvent.click(await screen.findByRole("button", { name: "扫描本机 Agent" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "扫描本机 Agent" });
+    // 兜底表单：自定义名字 + 路径
+    fireEvent.change(await within(dialog).findByLabelText("Agent 名称"), { target: { value: "my-agent" } });
+    fireEvent.change(within(dialog).getByLabelText("Skills 目录"), { target: { value: "/Users/test/my-skills" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "手动添加" }));
+
+    await waitFor(() => expect(mocked.addAgent).toHaveBeenCalledWith("/Users/test/.skill-hub", "my-agent", "/Users/test/my-skills"));
+    await waitFor(() => expect(mocked.listAgentTargets).toHaveBeenCalledTimes(2));
+  });
+
+  it("renders one card per managed agent with the … remove menu on the card", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Agents" }));
+
+    // 顶部不再有「已纳管 Agent」列表区块——卡片本身就是纳管 agent
+    expect(screen.queryByRole("group", { name: "已纳管 Agent" })).not.toBeInTheDocument();
+
+    // 每个纳管 agent 一张卡片，… 菜单在卡片右上角，移除作用于该 agent
+    const codexCard = await screen.findByRole("article", { name: "Agent codex" });
+    mocked.removeAgent.mockResolvedValue({ agent: "codex", removed: true });
+    fireEvent.click(within(codexCard).getByRole("button", { name: "更多操作 codex" }));
+    fireEvent.click(within(codexCard).getByRole("menuitem", { name: "移除纳管 codex" }));
+
+    await waitFor(() => expect(mocked.removeAgent).toHaveBeenCalledWith("/Users/test/.skill-hub", "codex"));
+    await waitFor(() => expect(mocked.listAgentTargets).toHaveBeenCalledTimes(2)); // 初始 + 移除后刷新
+  });
+
+  it("shows a card for managed agents that have no profiles yet", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Agents" }));
+
+    // claude 已纳管但无关联 profile → 仍须出现卡片（空态），不能只按 profile 渲染
+    const claudeCard = await screen.findByRole("article", { name: "Agent claude" });
+    expect(claudeCard).toHaveTextContent("无关联 profile");
+  });
+
+  it("shows an empty state when no unmanaged candidates exist", async () => {
+    mocked.scanLocalAgents.mockResolvedValue([
+      { agent: "codex", target: "/Users/test/.codex/skills", exists: true, skill_count: 3, managed: true },
+      { agent: "qoder", target: "/Users/test/.qoder/skills", exists: false, skill_count: 0, managed: false },
+    ]);
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Agents" }));
+    fireEvent.click(await screen.findByRole("button", { name: "扫描本机 Agent" }));
+
+    expect(await screen.findByText("未发现可纳管的本机 Agent")).toBeInTheDocument();
+    expect(mocked.addAgent).not.toHaveBeenCalled();
+  });
+});
+
 describe("Wave 5 remove vs delete split", () => {
   it("unassigns a skill from selected agents without deleting the vault entry", async () => {
     render(<App />);
@@ -577,5 +668,52 @@ describe("Wave 5 remove vs delete split", () => {
 
     await waitFor(() => expect(mocked.removeSkill).toHaveBeenCalledWith("/Users/test/.skill-hub", "k8s-finder", { purgeSource: true }));
     await waitFor(() => expect(mocked.listSkills).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("view-scoped topbar actions and agent badge consistency", () => {
+  it("shows the import button only on Library, not on Agents or Doctor", async () => {
+    render(<App />);
+    expect(await screen.findByRole("button", { name: "导入 skill" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Agents" }));
+    await screen.findByRole("button", { name: "扫描本机 Agent" });
+    expect(screen.queryByRole("button", { name: "导入 skill" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Doctor" }));
+    await screen.findByText("old-link");
+    expect(screen.queryByRole("button", { name: "导入 skill" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Library" }));
+    expect(await screen.findByRole("button", { name: "导入 skill" })).toBeInTheDocument();
+  });
+
+  it("renders one badge per managed agent even without a matching profile audit", async () => {
+    // audit 只覆盖 codex；claude 无 profile/audit → 徽章仍应按 agentTargets 全集出现
+    render(<App />);
+    await screen.findByText("k8s-finder");
+
+    const card = screen.getByRole("button", { name: "打开 k8s-finder" });
+    expect(within(card).getByText("codex", { selector: ".badge.agent" })).toBeInTheDocument();
+    expect(within(card).getByText("claude", { selector: ".badge.agent" })).toBeInTheDocument();
+    // 无 audit 报告的 agent 徽章为 disabled（未启用该 skill）
+    expect(within(card).getByText("claude", { selector: ".badge.agent" })).toHaveClass("disabled");
+  });
+
+  it("normalizes audit agent names to canonical labels when rendering badges", async () => {
+    mocked.auditAll.mockResolvedValue([
+      { profile: "claude-code", agent: "claude-code", effective_skills: ["k8s-finder"], missing_skills: [] },
+    ]);
+    mocked.listProfiles.mockResolvedValue(["claude-code"]);
+    mocked.getProfile.mockImplementation(async () => ({ name: "claude-code", agent: "claude-code", skills: ["k8s-finder"], exclude: [], effective_skills: ["k8s-finder"] }));
+
+    render(<App />);
+    await screen.findByText("k8s-finder");
+
+    // audit 的 claude-code 归一化成 claude 徽章，不出现两个 claude 变体
+    const card = screen.getByRole("button", { name: "打开 k8s-finder" });
+    expect(within(card).getByText("claude", { selector: ".badge.agent" })).toBeInTheDocument();
+    expect(within(card).queryByText("claude-code", { selector: ".badge.agent" })).not.toBeInTheDocument();
+    expect(within(card).getByText("claude", { selector: ".badge.agent" })).toHaveClass("enabled");
   });
 });

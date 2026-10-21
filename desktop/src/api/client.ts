@@ -106,6 +106,14 @@ export interface AgentTarget {
   target: string;
 }
 
+export interface ScanCandidate {
+  agent: string;
+  target: string;
+  exists: boolean;
+  skill_count: number;
+  managed: boolean;
+}
+
 export type SkillSourceRecord = Record<string, string>;
 
 const RESERVED_PROFILE_NAMES = new Set(["all-agent"]);
@@ -146,6 +154,34 @@ export async function listAgentTargets(root: string): Promise<AgentTarget[]> {
     "agent", "list", "--root", root, "--json",
   ]);
   return normalizeAgentTargets(data.agents);
+}
+
+/** Wave 6：扫描本机常见 agent 的 skills 目录，返回全部候选（含 exists/managed 状态）。 */
+export async function scanLocalAgents(root: string): Promise<ScanCandidate[]> {
+  const { data } = await runCliJson<{ candidates: ScanCandidate[] }>([
+    "agent", "scan", "--root", root, "--json",
+  ]);
+  return data.candidates.map((item) => ({ ...item, agent: canonicalAgentName(item.agent) }));
+}
+
+/** Wave 6：纳管一个本机 agent（写 workspace agents.yaml）。 */
+export async function addAgent(
+  root: string,
+  agent: string,
+  target: string,
+): Promise<{ agent: string; target: string; config: string }> {
+  const { data } = await runCliJson<{ agent: string; target: string; config: string }>([
+    "agent", "add", "--root", root, "--agent", agent, "--target", target, "--json",
+  ]);
+  return data;
+}
+
+/** Wave 6：移除纳管（删 agents.yaml 条目；内置 agent 不可移除，removed=false）。 */
+export async function removeAgent(root: string, agent: string): Promise<{ agent: string; removed: boolean }> {
+  const { data } = await runCliJson<{ agent: string; removed: boolean }>([
+    "agent", "remove", "--root", root, "--agent", agent, "--json",
+  ]);
+  return data;
 }
 
 export async function listSkills(root: string): Promise<RegistryEntry[]> {

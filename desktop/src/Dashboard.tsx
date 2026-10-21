@@ -28,8 +28,11 @@ import {
   listSkills,
   pickDirectory,
   registryDoctor,
+  removeAgent,
   removeSkill,
   resolveWorkspaceRoot,
+  scanLocalAgents,
+  addAgent,
   updateProfile,
   updateSkill,
   validateProfiles,
@@ -40,6 +43,7 @@ import type {
   ProfilePayload,
   ProfileValidation,
   RegistryEntry,
+  ScanCandidate,
   SkillDetail,
   SkillSourceRecord,
   SyncResultPayload,
@@ -100,6 +104,7 @@ export default function App() {
   const [importOpen, setImportOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<RegistryEntry | null>(null);
   const [unassignTarget, setUnassignTarget] = useState<RegistryEntry | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
@@ -232,9 +237,16 @@ export default function App() {
             <button className="command-trigger" onClick={() => setPaletteOpen(true)}>
               <Search size={14} /> 搜索或执行命令 <kbd>⌘K</kbd>
             </button>
-            <button className="import-trigger" onClick={() => setImportOpen(true)}>
-              <Library size={14} /> 导入 skill
-            </button>
+            {view === "library" && (
+              <button className="import-trigger" onClick={() => setImportOpen(true)}>
+                <Library size={14} /> 导入 skill
+              </button>
+            )}
+            {view === "agents" && (
+              <button className="import-trigger" aria-label="扫描本机 Agent" onClick={() => setScanOpen(true)}>
+                <Search size={14} /> 扫描本机 Agent
+              </button>
+            )}
           </div>
         </header>
 
@@ -251,12 +263,15 @@ export default function App() {
         {loading ? (
           <div className="empty-state">正在读取 workspace…</div>
         ) : view === "library" ? (
-          <LibraryView skills={skills} profiles={profileNames} audit={audit} onOpenSkill={openSkill} />
-        ) : view === "agents" ? (
+          <LibraryView skills={skills} audit={audit} agentTargets={agentTargets} onOpenSkill={openSkill} />
+        ) : view === "agents" && root ? (
           <AgentsView
             profiles={highlightedProfile ? profiles.filter((profile) => profile.name === highlightedProfile) : profiles}
             audit={audit}
             selectedProfile={highlightedProfile}
+            agentTargets={agentTargets}
+            root={root}
+            onChanged={refresh}
           />
         ) : (
           <DoctorView health={health} />
@@ -285,6 +300,17 @@ export default function App() {
           }}
           onUnassign={() => setUnassignTarget(selectedSkill)}
           onDelete={() => setRemoveTarget(selectedSkill)}
+        />
+      )}
+
+      {scanOpen && root && (
+        <ScanAgentsDialog
+          root={root}
+          onClose={() => setScanOpen(false)}
+          onApplied={(message) => {
+            setScanOpen(false);
+            refresh(message);
+          }}
         />
       )}
 
@@ -386,63 +412,159 @@ function NavButton({ active, icon, label, onClick }: { active: boolean; icon: Re
   return <button className={`nav-button ${active ? "active" : ""}`} onClick={onClick}>{icon}{label}</button>;
 }
 
-function LibraryView({ skills, profiles, audit, onOpenSkill }: {
+function LibraryView({ skills, audit, agentTargets, onOpenSkill }: {
   skills: RegistryEntry[];
-  profiles: string[];
   audit: AuditReport[];
+  agentTargets: AgentTarget[];
   onOpenSkill: (skill: RegistryEntry) => void;
 }) {
   if (skills.length === 0) return <div className="empty-state">vault 为空——用 CLI 导入第一个 skill 试试</div>;
+  // audit 的原始 agent 名（如 claude-code）归一化到 canonical（claude），与 agentTargets 同一 join key
+  const canonicalAgent = (agent: string) => agent === "claude-code" ? "claude" : agent;
   return (
     <section className="card-grid" aria-label="Skill library">
-      {skills.map((skill) => (
-        <button key={skill.name} className="skill-card" aria-label={`打开 ${skill.name}`} onClick={() => onOpenSkill(skill)}>
-          <div className="card-title mono">{skill.name}</div>
-          <p>{skill.description ?? "（无描述）"}</p>
-          <div className="badge-row">
-            {(() => {
-              // 徽章按 agent 聚合（多个 profile 可同属一个 agent，如 default+codex 都指 codex）；
-              // 任一 profile 命中该 skill 即 enabled
-              const byAgent = new Map<string, boolean>();
-              for (const profile of profiles) {
-                const report = audit.find((item) => item.profile === profile);
-                if (!report) continue;
-                const enabled = report.effective_skills.includes(skill.name);
-                byAgent.set(report.agent, (byAgent.get(report.agent) ?? false) || enabled);
-              }
-              return [...byAgent.entries()].map(([agent, enabled]) => (
-                <span key={agent} className={`badge agent ${enabled ? "enabled" : "disabled"}`}>{agent}</span>
-              ));
-            })()}
-            {(skill.tags ?? []).slice(0, 2).map((tag) => <span key={tag} className="badge">{tag}</span>)}
-          </div>
-        </button>
-      ))}
+      {skills.map((skill) => {
+        const enabledByAgent = new Map<string, boolean>();
+        for (const report of audit) {
+          const canonical = canonicalAgent(report.agent);
+          enabledByAgent.set(canonical, (enabledByAgent.get(canonical) ?? false) || report.effective_skills.includes(skill.name));
+        }
+        return (
+          <button key={skill.name} className="skill-card" aria-label={`打开 ${skill.name}`} onClick={() => onOpenSkill(skill)}>
+            <div className="card-title mono">{skill.name}</div>
+            <p>{skill.description ?? "（无描述）"}</p>
+            <div className="badge-row">
+              {agentTargets.map((target) => (
+                <span key={target.agent} className={`badge agent ${enabledByAgent.get(target.agent) ? "enabled" : "disabled"}`}>{target.agent}</span>
+              ))}
+              {(skill.tags ?? []).slice(0, 2).map((tag) => <span key={tag} className="badge">{tag}</span>)}
+            </div>
+          </button>
+        );
+      })}
     </section>
   );
 }
 
-function AgentsView({ profiles, audit, selectedProfile }: { profiles: ProfilePayload[]; audit: AuditReport[]; selectedProfile: string | null }) {
-  if (profiles.length === 0) return <div className="empty-state">尚未创建 profile</div>;
+function AgentsView({ profiles, audit, selectedProfile, agentTargets, root, onChanged }: {
+  profiles: ProfilePayload[];
+  audit: AuditReport[];
+  selectedProfile: string | null;
+  agentTargets: AgentTarget[];
+  root: string;
+  onChanged: (message: string) => void;
+}) {
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [menuAgent, setMenuAgent] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!menuAgent) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setMenuAgent(null);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuAgent(null);
+    };
+    window.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuAgent]);
+
+  const unregister = async (agent: string) => {
+    setRemoving(agent);
+    setRemoveError(null);
+    setMenuAgent(null);
+    try {
+      const { removed } = await removeAgent(root, agent);
+      onChanged(removed ? `已移除纳管 ${agent}` : `${agent} 是内置 Agent，无需移除`);
+    } catch (err) {
+      setRemoveError(`${agent} 移除失败：${String(err)}`);
+    } finally {
+      setRemoving(null);
+    }
+  };
+
+  if (agentTargets.length === 0 && profiles.length === 0) return <div className="empty-state">尚未纳管 Agent——点击顶栏「扫描本机 Agent」添加</div>;
+  const dedupe = (values: string[]) => [...new Set(values)];
+  // 每个纳管 agent 一张卡片；profile 指向未纳管 agent 时也合成卡片，保证 profile 不消失
+  const agentCards = (() => {
+    const byAgent = new Map<string, { agent: string; target: string | null; managed: boolean; profiles: ProfilePayload[] }>();
+    for (const target of agentTargets) {
+      byAgent.set(target.agent, { agent: target.agent, target: target.target, managed: true, profiles: [] });
+    }
+    for (const profile of profiles) {
+      let card = byAgent.get(profile.agent);
+      if (!card) {
+        card = { agent: profile.agent, target: null, managed: false, profiles: [] };
+        byAgent.set(profile.agent, card);
+      }
+      card.profiles.push(profile);
+    }
+    const cards = [...byAgent.values()];
+    return selectedProfile ? cards.filter((card) => card.profiles.some((profile) => profile.name === selectedProfile)) : cards;
+  })();
   return (
     <section className="stack-list">
-      {profiles.map((profile) => {
-        const report = audit.find((item) => item.profile === profile.name);
+      {agentCards.map((card) => {
+        const configured = dedupe(card.profiles.flatMap((profile) => profile.skills));
+        const effective = dedupe(card.profiles.flatMap((profile) => profile.effective_skills));
+        const excludes = dedupe(card.profiles.flatMap((profile) => profile.exclude));
+        const missing = dedupe(card.profiles.flatMap((profile) => audit.find((item) => item.profile === profile.name)?.missing_skills ?? []));
+        const highlighted = selectedProfile != null && card.profiles.some((profile) => profile.name === selectedProfile);
         return (
           <article
-            aria-label={`Profile ${profile.name}`}
-            className={`panel${selectedProfile === profile.name ? " highlighted" : ""}`}
-            data-highlighted={selectedProfile === profile.name ? "true" : "false"}
-            key={profile.name}
+            aria-label={`Agent ${card.agent}`}
+            className={`panel${highlighted ? " highlighted" : ""}`}
+            data-highlighted={highlighted ? "true" : "false"}
+            key={card.agent}
           >
-            <div className="panel-heading"><div><h2>{profile.name}</h2><span className="badge agent enabled">{profile.agent}</span></div><span>{profile.effective_skills.length} effective</span></div>
-            <div className="detail-section"><h3>Configured skills</h3><div className="badge-row">{profile.skills.length ? profile.skills.map((skill) => <span className="badge mono" key={skill}>{skill}</span>) : <span className="muted">无</span>}</div></div>
-            <div className="detail-section"><h3>Effective skills</h3><div className="badge-row">{profile.effective_skills.length ? profile.effective_skills.map((skill) => <span className="badge mono" key={skill}>{skill}</span>) : <span className="muted">无</span>}</div></div>
-            <div className="detail-section"><h3>Exclude patterns</h3><div className="badge-row">{profile.exclude.length ? profile.exclude.map((item) => <span className="badge mono" key={item}>{item}</span>) : <span className="muted">无</span>}</div></div>
-            {(report?.missing_skills.length ?? 0) > 0 && <div className="issue-list">{report?.missing_skills.map((item) => <span key={item}><AlertCircle size={14} />{item}</span>)}</div>}
+            <div className="panel-heading">
+              <div><h2>{card.agent}</h2>{card.target && <span className="mono muted agent-target">{card.target}</span>}{!card.managed && <span className="badge">未纳管</span>}</div>
+              <div className="panel-heading-side">
+                <span>{effective.length} effective</span>
+                {card.managed && (
+                  <div className="agent-row-menu" ref={menuAgent === card.agent ? menuRef : null}>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      aria-label={`更多操作 ${card.agent}`}
+                      aria-expanded={menuAgent === card.agent}
+                      onClick={() => setMenuAgent((current) => current === card.agent ? null : card.agent)}
+                    >
+                      …
+                    </button>
+                    {menuAgent === card.agent && (
+                      <div className="agent-menu-popover" role="menu">
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="danger"
+                          aria-label={`移除纳管 ${card.agent}`}
+                          disabled={removing === card.agent}
+                          onClick={() => { void unregister(card.agent); }}
+                        >
+                          {removing === card.agent ? "移除中…" : "移除纳管"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="detail-section"><h3>Profiles</h3><div className="badge-row">{card.profiles.length ? card.profiles.map((profile) => <span className="badge mono" key={profile.name}>{profile.name}</span>) : <span className="muted">无关联 profile</span>}</div></div>
+            <div className="detail-section"><h3>Configured skills</h3><div className="badge-row">{configured.length ? configured.map((skill) => <span className="badge mono" key={skill}>{skill}</span>) : <span className="muted">无</span>}</div></div>
+            <div className="detail-section"><h3>Effective skills</h3><div className="badge-row">{effective.length ? effective.map((skill) => <span className="badge mono" key={skill}>{skill}</span>) : <span className="muted">无</span>}</div></div>
+            <div className="detail-section"><h3>Exclude patterns</h3><div className="badge-row">{excludes.length ? excludes.map((item) => <span className="badge mono" key={item}>{item}</span>) : <span className="muted">无</span>}</div></div>
+            {missing.length > 0 && <div className="issue-list">{missing.map((item) => <span key={item}><AlertCircle size={14} />{item}</span>)}</div>}
           </article>
         );
       })}
+      {removeError && <div className="detail-warning"><AlertCircle size={14} />{removeError}</div>}
     </section>
   );
 }
@@ -565,6 +687,133 @@ function CommandPalette({ root, initialSkills, query, onQuery, onNavigate, onOpe
         <div className="palette-input"><Search size={16} /><input autoFocus value={query} onChange={(event) => onQuery(event.target.value)} placeholder="搜索 skills 或输入命令…" /><kbd>esc</kbd></div>
         <div className="palette-group"><h3>导航</h3>{(["library", "agents", "doctor"] as View[]).map((item) => <button key={item} aria-label={`前往 ${item[0].toUpperCase()}${item.slice(1)}`} onClick={() => onNavigate(item)}><CommandIcon size={14} />前往 {item[0].toUpperCase()}{item.slice(1)}</button>)}</div>
         <div className="palette-group"><h3>Skills</h3>{matches.map((skill) => <button key={skill.name} onClick={() => onOpenSkill(skill)}><Library size={14} /><span><strong className="mono">{skill.name}</strong><small>{skill.description}</small></span></button>)}{searching && <p className="palette-empty">正在搜索…</p>}{!searching && searchError && <p className="palette-empty error">搜索失败：{searchError}</p>}{!searching && !searchError && matches.length === 0 && <p className="palette-empty">没有匹配的 skill</p>}</div>
+      </section>
+    </div>
+  );
+}
+
+function ScanAgentsDialog({ root, onClose, onApplied }: {
+  root: string;
+  onClose: () => void;
+  onApplied: (message: string) => void;
+}) {
+  const [candidates, setCandidates] = useState<ScanCandidate[] | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [applying, setApplying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [manualName, setManualName] = useState("");
+  const [manualTarget, setManualTarget] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    scanLocalAgents(root)
+      .then((items) => { if (alive) setCandidates(items); })
+      .catch((err) => { if (alive) { setWarning(String(err)); setCandidates([]); } });
+    return () => { alive = false; };
+  }, [root]);
+
+  // 只列出存在且未纳管的候选
+  const available = (candidates ?? []).filter((item) => item.exists && !item.managed);
+
+  const toggle = (agent: string) => {
+    setSelected((current) => current.includes(agent) ? current.filter((item) => item !== agent) : [...current, agent]);
+  };
+
+  const confirmAdd = async () => {
+    setApplying(true);
+    setError(null);
+    try {
+      for (const agent of selected) {
+        const item = available.find((entry) => entry.agent === agent);
+        if (!item) continue;
+        await addAgent(root, item.agent, item.target);
+      }
+      onApplied(`已纳管 ${selected.length} 个 Agent`);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const addManual = async () => {
+    const name = manualName.trim();
+    const target = manualTarget.trim();
+    if (!name || !target) return;
+    setApplying(true);
+    setError(null);
+    try {
+      await addAgent(root, name, target);
+      onApplied(`已纳管 ${name}`);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  return (
+    <div className="palette-backdrop" onMouseDown={onClose}>
+      <section className="assign-dialog" role="dialog" aria-label="扫描本机 Agent" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="details-header">
+          <div><span className="eyebrow">Scan agents</span><h2>扫描本机 Agent</h2></div>
+          <button className="icon-button" aria-label="关闭" onClick={onClose}><X size={17} /></button>
+        </div>
+        <p className="muted">探测本机常见 Agent 的 skills 目录；勾选确认后纳入 skill-hub 统一管理（可分配、可同步软链）。</p>
+        <label className="field-label">发现的 Agent</label>
+        <div className="agent-picker" role="group" aria-label="可纳管的本机 Agent">
+          {candidates === null && <p className="muted">扫描中…</p>}
+          {candidates !== null && available.length === 0 && <p className="muted">未发现可纳管的本机 Agent</p>}
+          {available.map((item) => (
+            <label key={item.agent} className={`agent-option ${selected.includes(item.agent) ? "checked" : ""}`}>
+              <input
+                type="checkbox"
+                aria-label={item.agent}
+                checked={selected.includes(item.agent)}
+                onChange={() => toggle(item.agent)}
+              />
+              <span className="mono">{item.agent}</span>
+              <small>{item.target} · {item.skill_count} skills</small>
+            </label>
+          ))}
+          {warning && <div className="detail-warning"><AlertCircle size={14} />扫描失败：{warning}</div>}
+        </div>
+        <label className="field-label" htmlFor="manual-agent-name">没扫到？手动添加（兜底）</label>
+        <div className="source-input-row">
+          <input
+            id="manual-agent-name"
+            className="text-input mono"
+            value={manualName}
+            placeholder="Agent 名称，如 my-agent"
+            aria-label="Agent 名称"
+            onChange={(event) => setManualName(event.target.value)}
+          />
+          <input
+            id="manual-agent-target"
+            className="text-input mono"
+            value={manualTarget}
+            placeholder="/path/to/skills"
+            aria-label="Skills 目录"
+            onChange={(event) => setManualTarget(event.target.value)}
+          />
+          <button
+            type="button"
+            className="browse-button"
+            aria-label="手动添加"
+            disabled={!manualName.trim() || !manualTarget.trim() || applying}
+            onClick={() => { void addManual(); }}
+          >
+            手动添加
+          </button>
+        </div>
+        {error && <div className="detail-warning"><AlertCircle size={14} />纳管失败：{error}</div>}
+        <div className="dialog-actions">
+          <button onClick={onClose}>取消</button>
+          <button className="primary" disabled={selected.length === 0 || applying} onClick={() => { void confirmAdd(); }}>
+            {applying ? "纳管中…" : "确认纳管"}
+          </button>
+        </div>
       </section>
     </div>
   );

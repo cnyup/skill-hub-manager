@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from skill_hub_manager import __version__
-from skill_hub_manager.agents import detect_agent_target, list_agent_targets
+from skill_hub_manager.agents import add_agent_target, canonical_agent_name, detect_agent_target, list_agent_targets, remove_agent_target, scan_local_agents
 from skill_hub_manager.audit import audit_profiles, render_audit_json
 from skill_hub_manager.doctor import find_broken_links, find_missing_expected_links, load_sync_target
 from skill_hub_manager.install_state import (
@@ -62,6 +62,21 @@ def build_parser() -> argparse.ArgumentParser:
     agent_list = agent_subparsers.add_parser("list")
     agent_list.add_argument("--root")
     agent_list.add_argument("--json", action="store_true")
+
+    agent_scan = agent_subparsers.add_parser("scan")
+    agent_scan.add_argument("--root")
+    agent_scan.add_argument("--json", action="store_true")
+
+    agent_add = agent_subparsers.add_parser("add")
+    agent_add.add_argument("--root", required=True)
+    agent_add.add_argument("--agent", required=True)
+    agent_add.add_argument("--target", required=True)
+    agent_add.add_argument("--json", action="store_true")
+
+    agent_remove = agent_subparsers.add_parser("remove")
+    agent_remove.add_argument("--root", required=True)
+    agent_remove.add_argument("--agent", required=True)
+    agent_remove.add_argument("--json", action="store_true")
 
     agent_detect = agent_subparsers.add_parser("detect")
     agent_detect.add_argument("--root", required=True)
@@ -250,6 +265,57 @@ def _cmd_agent_list(args: argparse.Namespace) -> int:
         return 0
     for item in agents:
         print(f"{item['agent']}: {item['target']}")
+    return 0
+
+
+def _cmd_agent_scan(args: argparse.Namespace) -> int:
+    root = resolve_workspace_root(_optional_path(args.root))
+    candidates = [
+        {
+            "agent": item.agent,
+            "target": str(item.path),
+            "exists": item.exists,
+            "skill_count": item.skill_count,
+            "managed": item.managed,
+        }
+        for item in scan_local_agents(root)
+    ]
+    if args.json:
+        print(json.dumps({"candidates": candidates}, indent=2))
+        return 0
+    for item in candidates:
+        state = "managed" if item["managed"] else ("found" if item["exists"] else "not-found")
+        print(f"{item['agent']}: {item['target']} [{state}] skills={item['skill_count']}")
+    return 0
+
+
+def _cmd_agent_add(args: argparse.Namespace) -> int:
+    root = resolve_workspace_root(_optional_path(args.root))
+    target = Path(args.target).expanduser()
+    if not target.is_dir():
+        message = f"target directory does not exist: {target}"
+        if args.json:
+            print(json.dumps({"error": message}, indent=2))
+        else:
+            print(message)
+        return 1
+    config = add_agent_target(root, args.agent, target)
+    payload = {"agent": canonical_agent_name(args.agent), "target": str(target), "config": str(config)}
+    if args.json:
+        print(json.dumps(payload, indent=2))
+    else:
+        print(f"registered {payload['agent']} -> {target} ({config})")
+    return 0
+
+
+def _cmd_agent_remove(args: argparse.Namespace) -> int:
+    root = resolve_workspace_root(_optional_path(args.root))
+    removed = remove_agent_target(root, args.agent)
+    payload = {"agent": canonical_agent_name(args.agent), "removed": removed}
+    if args.json:
+        print(json.dumps(payload, indent=2))
+    else:
+        print(f"removed {payload['agent']}" if removed else f"nothing to remove for {payload['agent']} (builtin or not registered)")
     return 0
 
 
@@ -926,6 +992,9 @@ def _cmd_profile_validate(args: argparse.Namespace) -> int:
 _DISPATCH: dict[tuple[str, str | None], callable] = {
     ("agent", "list"): _cmd_agent_list,
     ("agent", "detect"): _cmd_agent_detect,
+    ("agent", "scan"): _cmd_agent_scan,
+    ("agent", "add"): _cmd_agent_add,
+    ("agent", "remove"): _cmd_agent_remove,
     ("scan", None): _cmd_scan,
     ("ls", None): _cmd_ls,
     ("find", None): _cmd_find,

@@ -7,3 +7,14 @@ __pycache__/
 .DS_Store
 .omo/
 
+# Agent session artifacts — not for the repository
+.rivet/
+node_modules/
+dist/
+
+# Project working docs (owner decision: keep out of the repository)
+AGENTS.md
+docs/handoff/
+docs/superpowers/
+uv.lock
+

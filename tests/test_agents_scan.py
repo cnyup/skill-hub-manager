@@ -50,7 +50,7 @@ class ScanLocalAgentsTests(unittest.TestCase):
             candidates = {item.agent: item for item in scan_local_agents(root)}
 
             self.assertTrue(candidates["zcode"].managed)
-            self.assertFalse(candidates["opencode"].managed)
+            self.assertFalse(candidates["qoder"].managed)
 
     def test_builtin_agents_are_managed_by_default(self):
         with tempfile.TemporaryDirectory() as temp_dir:

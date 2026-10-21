@@ -80,7 +80,7 @@ class AtomicWriteTextTests(unittest.TestCase):
             target.write_text("original", encoding="utf-8")
 
             with mock.patch(
-                "skill_hub_manager.state_io.Path.write_text",
+                "skill_hub_manager.state_io.os.fdopen",
                 side_effect=OSError("disk full"),
             ):
                 with self.assertRaises(OSError):

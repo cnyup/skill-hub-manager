@@ -6,6 +6,8 @@ from pathlib import Path
 from skill_hub_manager.state_io import atomic_write_text
 from skill_hub_manager.validation import validate_identifier
 
+_RESERVED_PROFILE_NAMES = {"all-agent"}
+
 
 @dataclass(frozen=True)
 class Profile:

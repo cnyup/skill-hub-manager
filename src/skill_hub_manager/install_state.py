@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from skill_hub_manager.fsutil import atomic_write_text
+from skill_hub_manager.state_io import atomic_write_text
 
 
 def load_install_records(path: Path) -> list[dict[str, str]]:
@@ -15,15 +15,12 @@ def load_install_records(path: Path) -> list[dict[str, str]]:
 
 
 def write_install_records(path: Path, records: list[dict[str, str]]) -> Path:
-    atomic_write_text(path, json.dumps({"records": records}, indent=2) + "\n")
-    return path
+    return atomic_write_text(path, json.dumps({"records": records}, indent=2) + "\n")
 
 
 def find_install_record(records: list[dict[str, str]], agent: str) -> dict[str, str] | None:
-    for record in records:
-        if record.get("agent") == agent:
-            return record
-    return None
+    matches = [record for record in records if record.get("agent") == agent]
+    return matches[0] if len(matches) == 1 else None
 
 
 def upsert_install_record(

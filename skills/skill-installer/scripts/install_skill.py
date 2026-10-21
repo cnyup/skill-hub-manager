@@ -75,7 +75,8 @@ def slugify_repo(repo_url: str) -> str:
 
 def normalize_subpath(subpath: str) -> str:
     cleaned = subpath.strip().strip("/")
-    if not cleaned:
+    parts = cleaned.split("/")
+    if not cleaned or any(part in {"", ".", ".."} for part in parts) or "\\" in cleaned:
         raise ValueError("source subpath cannot be empty")
     return cleaned
 
@@ -165,7 +166,7 @@ def parse_source(
                 import_subpath=source_subpath,
             )
 
-    if source.endswith(".git"):
+    if parsed.scheme == "file" or source.endswith(".git"):
         cache_suffix = source if git_ref is None else f"{source}@{git_ref}"
         cache_dir = workspace_root / "sources" / slugify_repo(cache_suffix)
         if source_subpath:
@@ -217,9 +218,9 @@ def ensure_remote_checkout(repo_url: str, checkout_dir: Path, update: bool, git_
     if normalize_repo_identity(origin) != normalize_repo_identity(repo_url):
         raise ValueError(f"remote cache origin mismatch: expected {repo_url}, found {origin}")
     if git_ref:
-        run(["git", "-C", str(checkout_dir), "checkout", git_ref])
+        run(["git", "-C", str(checkout_dir), "fetch", "origin", git_ref])
+        run(["git", "-C", str(checkout_dir), "checkout", "--detach", "FETCH_HEAD"])
     if update and git_ref:
-        run(["git", "-C", str(checkout_dir), "pull", "--ff-only", "origin", git_ref])
         return checkout_dir
     if update:
         run(["git", "-C", str(checkout_dir), "pull", "--ff-only"])

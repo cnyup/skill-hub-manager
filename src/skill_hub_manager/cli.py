@@ -451,6 +451,7 @@ def _cmd_sync(args: argparse.Namespace) -> int:
             result.linked,
             result.missing,
             result.removed,
+            result.conflicts,
         )
     if args.json:
         print(
@@ -460,10 +461,11 @@ def _cmd_sync(args: argparse.Namespace) -> int:
                 linked=result.linked,
                 missing=result.missing,
                 removed=result.removed,
+                conflicts=result.conflicts,
                 dry_run=args.dry_run,
             )
         )
-        return 1 if result.missing else 0
+        return 1 if result.missing or result.conflicts else 0
     if args.dry_run:
         for name in result.linked:
             print(f"would-link: {name}")
@@ -471,14 +473,18 @@ def _cmd_sync(args: argparse.Namespace) -> int:
             print(f"would-miss: {name}")
         for name in result.removed:
             print(f"would-remove: {name}")
-        return 1 if result.missing else 0
+        for name in result.conflicts:
+            print(f"would-conflict: {name}")
+        return 1 if result.missing or result.conflicts else 0
     for name in result.linked:
         print(f"linked: {name}")
     for name in result.missing:
         print(f"missing: {name}")
     for name in result.removed:
         print(f"removed: {name}")
-    return 1 if result.missing else 0
+    for name in result.conflicts:
+        print(f"conflict: {name}")
+    return 1 if result.missing or result.conflicts else 0
 
 
 def _cmd_doctor(args: argparse.Namespace) -> int:

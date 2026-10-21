@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from skill_hub_manager.fsutil import atomic_write_text
+from skill_hub_manager.state_io import atomic_write_text
 from skill_hub_manager.install_state import find_install_record, load_install_records
 from skill_hub_manager.paths import install_state_file
 from skill_hub_manager.profiles import load_profile
@@ -17,6 +17,7 @@ _DEFAULT_TARGETS: dict[str, Path] = {
     "claude": Path.home() / ".claude" / "skills",
     "cursor": Path.home() / ".cursor" / "skills",
     "windsurf": Path.home() / ".codeium" / "windsurf" / "skills",
+    "opencode": Path.home() / ".config" / "opencode" / "skills",
 }
 
 # Scan candidates for local agent discovery (Wave 6). Data table, not logic —
@@ -202,16 +203,17 @@ def _remove_agent_profiles(workspace_root: Path, canonical_agent: str) -> list[s
 
 def detect_agent_target(root: Path, agent_hint: str | None) -> DetectionResult:
     if agent_hint:
-        canonical_agent = canonical_agent_name(agent_hint)
         records = load_install_records(install_state_file(root))
-        record = next(
-            (
-                found
-                for lookup_name in _agent_lookup_names(canonical_agent)
-                if (found := find_install_record(records, lookup_name)) is not None
-            ),
-            None,
-        )
+        matches = [record for record in records if record.get("agent") == agent_hint]
+        if len(matches) > 1:
+            return DetectionResult(
+                agent=agent_hint,
+                detected=False,
+                confidence="low",
+                target_dir=None,
+                reason="ambiguous-install-record",
+            )
+        record = find_install_record(records, agent_hint)
         if record and record.get("target_dir"):
             return DetectionResult(
                 agent=canonical_agent,

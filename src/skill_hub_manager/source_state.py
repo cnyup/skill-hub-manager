@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from skill_hub_manager.fsutil import atomic_write_text
+from skill_hub_manager.state_io import atomic_write_text
 
 
 def load_source_records(path: Path) -> list[dict[str, str]]:
@@ -15,8 +15,7 @@ def load_source_records(path: Path) -> list[dict[str, str]]:
 
 
 def write_source_records(path: Path, records: list[dict[str, str]]) -> Path:
-    atomic_write_text(path, json.dumps({"records": records}, indent=2) + "\n")
-    return path
+    return atomic_write_text(path, json.dumps({"records": records}, indent=2) + "\n")
 
 
 def upsert_source_record(

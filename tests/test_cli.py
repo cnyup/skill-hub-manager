@@ -34,6 +34,22 @@ class CliTests(unittest.TestCase):
         self.assertEqual(payload["reason"], "builtin-agent-mapping")
         self.assertEqual(payload["target_dir"], str(Path.home() / ".codex" / "skills"))
 
+    def test_agent_detect_json_output_for_opencode(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            output = io.StringIO()
+
+            with contextlib.redirect_stdout(output):
+                exit_code = main(["agent", "detect", "--root", str(root), "--agent", "opencode", "--json"])
+
+        payload = json.loads(output.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(payload["detected"])
+        self.assertEqual(payload["agent"], "opencode")
+        self.assertEqual(payload["confidence"], "medium")
+        self.assertEqual(payload["reason"], "builtin-agent-mapping")
+        self.assertEqual(payload["target_dir"], str(Path.home() / ".config" / "opencode" / "skills"))
+
     def test_install_state_record_and_show_round_trip(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

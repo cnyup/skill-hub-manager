@@ -64,7 +64,7 @@ Verify the final result:
 ### If You Do Not Yet Have Any Agent-Readable Skill Directory
 
 Use the manual CLI path below first.
-After the manager is installed, expose `skills/skill-installer/` to the agent so future business skill installs can stay conversational.
+After the manager is installed, expose `skills/skill-installer/` to the agent so future business skill installs can stay conversational. OpenCode can load this bootstrap skill from `~/.config/opencode/skills/` globally or from `<project>/.opencode/skills/` for one project.
 
 ## Installing Business Skills
 
@@ -87,6 +87,24 @@ The installer should:
 
 If you want the skill visible to a specific agent, keep talking to the agent and ask it to update the relevant profile and sync target.
 Do not run those steps yourself unless you are using the CLI fallback.
+
+### OpenCode Through an LLM
+
+Use the global target `~/.config/opencode/skills/` only for skills that should be available in every OpenCode project. For project isolation, sync to `<project>/.opencode/skills/` instead.
+
+From an OpenCode session opened in the target project, send:
+
+```text
+Install this skill into my skill-hub workspace and expose it only to this OpenCode project:
+https://github.com/example-org/example-repo/tree/main/skills/web-access
+
+Project directory: /path/to/project
+Profile name: opencode-project
+Sync target: /path/to/project/.opencode/skills
+Before any clone, update, profile change, or sync, show the complete plan and ask for confirmation.
+```
+
+The LLM should keep the source in `~/.skill-hub`, update only the named profile, and sync only to the requested project target. It must not substitute the global target unless you explicitly request global availability. Quit and restart OpenCode after syncing because it loads skills at startup.
 
 If the repository uses a non-default branch, tag, commit, or a custom skill path, supply an explicit git ref and source subpath.
 This is especially important when a GitHub tree URL uses a branch name containing `/`, such as `feature/demo`.
@@ -113,6 +131,14 @@ Use the wrapper when working from a checkout:
 ./bin/skill-hub sync --root ~/.skill-hub --target ~/.codex/skills --dry-run
 ./bin/skill-hub sync --root ~/.skill-hub --target ~/.codex/skills
 ```
+
+OpenCode global example:
+
+```bash
+./bin/skill-hub sync --root ~/.skill-hub --target ~/.config/opencode/skills
+```
+
+For a project-only OpenCode install, replace the target with `/path/to/project/.opencode/skills`.
 
 Use the installed command on a normal workstation:
 

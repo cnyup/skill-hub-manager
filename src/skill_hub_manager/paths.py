@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from skill_hub_manager.fsutil import atomic_write_text
+from skill_hub_manager.state_io import atomic_write_text
 
 
 @dataclass(frozen=True)

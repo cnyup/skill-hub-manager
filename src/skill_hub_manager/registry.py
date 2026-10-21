@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from skill_hub_manager.fsutil import atomic_write_text
+from skill_hub_manager.state_io import atomic_write_text
 from skill_hub_manager.skills import scan_skills
 
 
@@ -9,14 +9,14 @@ def build_registry(vault: Path) -> str:
     lines = ["skills:"]
     for name, skill in scan_skills(vault).items():
         lines.append(f"  {name}:")
-        lines.append(f"    path: {skill.path}")
-        lines.append(f"    visibility: {skill.visibility}")
+        lines.append(f"    path: {_yaml_scalar(str(skill.path))}")
+        lines.append(f"    visibility: {_yaml_scalar(skill.visibility)}")
         if skill.description:
-            lines.append(f"    description: {skill.description}")
+            lines.append(f"    description: {_yaml_scalar(skill.description)}")
         if skill.agents:
-            lines.append(f"    agents: [{', '.join(skill.agents)}]")
+            lines.append(f"    agents: {json.dumps(list(skill.agents), ensure_ascii=False)}")
         if skill.tags:
-            lines.append(f"    tags: [{', '.join(skill.tags)}]")
+            lines.append(f"    tags: {json.dumps(list(skill.tags), ensure_ascii=False)}")
     lines.append("")
     return "\n".join(lines)
 
@@ -46,10 +46,9 @@ def load_registry_entries(registry_file: Path) -> list[dict[str, str | list[str]
         key, value = line.strip().split(":", 1)
         value = value.strip()
         if value.startswith("[") and value.endswith("]"):
-            inner = value[1:-1].strip()
-            current[key] = [] if not inner else [item.strip() for item in inner.split(",")]
+            current[key] = json.loads(value)
             continue
-        current[key] = value
+        current[key] = json.loads(value) if value.startswith('"') else value
     return entries
 
 
@@ -106,3 +105,7 @@ def doctor_registry(vault: Path, registry_file: Path) -> list[str]:
 
 def render_registry_doctor_json(issues: list[str]) -> str:
     return json.dumps({"ok": not issues, "issues": issues}, indent=2)
+
+
+def _yaml_scalar(value: str) -> str:
+    return json.dumps(value, ensure_ascii=False)

@@ -66,7 +66,7 @@ agent 应该执行：
 ### 如果你当前还没有任何 Agent 可读取的 Skills 目录
 
 先使用下面的手动 CLI 安装方式。
-manager 装好后，再把 `skills/skill-installer/` 暴露给 agent，这样后续业务 skill 安装就能继续通过对话完成。
+manager 装好后，再把 `skills/skill-installer/` 暴露给 agent，这样后续业务 skill 安装就能继续通过对话完成。OpenCode 可以从全局 `~/.config/opencode/skills/` 加载这个 bootstrap skill，也可以只从某个项目的 `<project>/.opencode/skills/` 加载。
 
 ## 安装业务 Skills
 
@@ -107,6 +107,24 @@ https://github.com/example-org/example-repo/tree/main/skills/web-access
 如果你希望某个具体 agent 能看到这个 skill，就继续告诉 agent 去更新对应 profile 和 sync 目标目录。
 除非你明确要走 CLI 兜底路径，否则这些步骤不需要你自己手工执行。
 
+### 通过 LLM 给 OpenCode 安装
+
+只有希望所有 OpenCode 项目都能使用时，才同步到全局目录 `~/.config/opencode/skills/`。需要项目隔离时，应同步到 `<project>/.opencode/skills/`。
+
+在目标项目目录中打开 OpenCode 后，发送：
+
+```text
+帮我把这个 skill 安装到 skill-hub workspace，并且只暴露给当前 OpenCode 项目：
+https://github.com/example-org/example-repo/tree/main/skills/web-access
+
+项目目录：/path/to/project
+Profile 名称：opencode-project
+Sync 目标：/path/to/project/.opencode/skills
+在任何 clone、update、profile 修改或 sync 前，先展示完整计划并征求确认。
+```
+
+LLM 应将源 skill 保留在 `~/.skill-hub`，只更新指定 profile，并且只同步到给出的项目目录。除非你明确要求全局可用，否则不能替换为全局目标。同步后退出并重启 OpenCode，因为它在启动时加载 skills。
+
 如果仓库使用了非默认分支、tag、commit，或者 skill 在自定义路径下，建议显式给出 git ref 和 source subpath。
 如果 GitHub tree URL 对应的分支名本身带 `/`，例如 `feature/demo`，更不要依赖自动猜测。
 
@@ -132,6 +150,14 @@ https://github.com/example-org/example-repo/tree/main/skills/web-access
 ./bin/skill-hub sync --root ~/.skill-hub --target ~/.codex/skills --dry-run
 ./bin/skill-hub sync --root ~/.skill-hub --target ~/.codex/skills
 ```
+
+OpenCode 全局示例：
+
+```bash
+./bin/skill-hub sync --root ~/.skill-hub --target ~/.config/opencode/skills
+```
+
+若只为单个 OpenCode 项目安装，将目标替换为 `/path/to/project/.opencode/skills`。
 
 在正常工作站上安装后直接使用命令：
 

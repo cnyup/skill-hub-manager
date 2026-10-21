@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from skill_hub_manager.fsutil import atomic_write_text
+from skill_hub_manager.state_io import atomic_write_text
 
 
 class AtomicWriteTextTests(unittest.TestCase):
@@ -50,7 +50,7 @@ class AtomicWriteTextTests(unittest.TestCase):
             def exploding_replace(src, dst):
                 raise OSError("simulated crash before replace")
 
-            with mock.patch("skill_hub_manager.fsutil.os.replace", exploding_replace):
+            with mock.patch("skill_hub_manager.state_io.os.replace", exploding_replace):
                 with self.assertRaises(OSError):
                     atomic_write_text(target, '{"records": ["partial"]}')
 
@@ -67,7 +67,7 @@ class AtomicWriteTextTests(unittest.TestCase):
             def exploding_replace(src, dst):
                 raise OSError("boom")
 
-            with mock.patch("skill_hub_manager.fsutil.os.replace", exploding_replace):
+            with mock.patch("skill_hub_manager.state_io.os.replace", exploding_replace):
                 with self.assertRaises(OSError):
                     atomic_write_text(target, "partial")
 
@@ -80,7 +80,7 @@ class AtomicWriteTextTests(unittest.TestCase):
             target.write_text("original", encoding="utf-8")
 
             with mock.patch(
-                "skill_hub_manager.fsutil.Path.write_text",
+                "skill_hub_manager.state_io.Path.write_text",
                 side_effect=OSError("disk full"),
             ):
                 with self.assertRaises(OSError):
